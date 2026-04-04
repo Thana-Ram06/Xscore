@@ -3,6 +3,7 @@ import { useParams, Link } from "wouter";
 import { Layout } from "@/components/Layout";
 import { AnimatedCounter } from "@/components/AnimatedCounter";
 import { useAnalyzeAccount, useGetSearchHistory } from "@workspace/api-client-react";
+import type { AnalyzeResult } from "@workspace/api-client-react";
 import {
   ArrowUpRight,
   ArrowDownRight,
@@ -17,6 +18,19 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+
+// ── Extended type that includes breakdown returned by the upgraded API ────────
+interface ScoreBreakdown {
+  engagement: number;
+  followerQuality: number;
+  growth: number;
+  activity: number;
+  authority: number;
+}
+
+type AnalyzeResultWithBreakdown = AnalyzeResult & {
+  breakdown?: ScoreBreakdown;
+};
 
 function getScoreLabel(score: number): string {
   if (score >= 700) return "Excellent";
@@ -58,6 +72,68 @@ function formatNum(n: number): string {
   return n.toLocaleString();
 }
 
+// ── Breakdown bar ─────────────────────────────────────────────────────────────
+function BreakdownBar({
+  label,
+  score,
+  weight,
+  color,
+}: {
+  label: string;
+  score: number;
+  weight: string;
+  color: string;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-foreground font-medium">{label}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-muted-foreground">{weight}</span>
+          <span className={`font-semibold tabular-nums ${color}`}>
+            {score.toFixed(1)}
+            <span className="text-muted-foreground font-normal">/100</span>
+          </span>
+        </div>
+      </div>
+      <div className="h-1.5 w-full rounded-full bg-border overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-700 ${color.replace("text-", "bg-")}`}
+          style={{ width: `${score}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ScoreBreakdownPanel({ breakdown }: { breakdown: ScoreBreakdown }) {
+  const factors = [
+    { label: "Engagement",      key: "engagement"      as const, weight: "35%", color: "text-primary"     },
+    { label: "Follower Quality", key: "followerQuality" as const, weight: "25%", color: "text-violet-400"  },
+    { label: "Growth",           key: "growth"          as const, weight: "15%", color: "text-emerald-400" },
+    { label: "Activity",         key: "activity"        as const, weight: "15%", color: "text-amber-400"   },
+    { label: "Authority",        key: "authority"       as const, weight: "10%", color: "text-blue-400"    },
+  ];
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-6 space-y-4">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="font-serif text-lg">Score Breakdown</h3>
+        <span className="text-xs text-muted-foreground">Multi-factor analysis</span>
+      </div>
+      {factors.map((f) => (
+        <BreakdownBar
+          key={f.key}
+          label={f.label}
+          score={breakdown[f.key]}
+          weight={f.weight}
+          color={f.color}
+        />
+      ))}
+    </div>
+  );
+}
+
 function StatCard({
   label,
   value,
@@ -85,10 +161,13 @@ export default function Dashboard() {
 
   const {
     mutate: analyze,
-    data: analyzeData,
+    data: _analyzeData,
     isPending: isAnalyzing,
     error,
   } = useAnalyzeAccount();
+
+  // Cast to extended type that includes breakdown from the upgraded API
+  const analyzeData = _analyzeData as AnalyzeResultWithBreakdown | undefined;
 
   const { data: historyData, isLoading: isLoadingHistory } = useGetSearchHistory();
 
@@ -276,6 +355,11 @@ export default function Dashboard() {
                 accent="bg-orange-500/10 text-orange-400"
               />
             </div>
+
+            {/* Score breakdown */}
+            {analyzeData.breakdown && (
+              <ScoreBreakdownPanel breakdown={analyzeData.breakdown} />
+            )}
           </>
         )}
 
