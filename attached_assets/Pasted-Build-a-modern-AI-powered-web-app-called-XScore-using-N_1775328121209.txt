@@ -1,0 +1,80 @@
+Build a modern AI-powered web app called "XScore" using Next.js 16 App Router, TypeScript, and Tailwind CSS.
+
+The app analyzes X (Twitter) usernames and generates an influence score with analytics.
+
+CORE FEATURES:
+- Input field to enter X username
+- Analyze button
+- Fetch mock or API-based Twitter data (followers, following, tweets, engagement)
+- Calculate score based on:
+  score = (followers × engagement rate) / 100
+- Display:
+  - Score (0–1000)
+  - Followers count
+  - Engagement rate
+  - Growth indicator
+- Store previous searches in Firebase Firestore
+
+UI/UX REQUIREMENTS:
+- Premium SaaS UI inspired by tpot.cc and modern AI tools
+- Centered layout
+- Minimal, clean, high-end design
+- Large hero typography
+- Soft rounded cards
+- No heavy shadows
+- Subtle borders
+- Smooth hover animations
+- Dark mode (default) + light mode toggle
+
+FONTS:
+- Use "Instrument Serif" for headings
+- Use "Inter" for body text
+
+HOMEPAGE:
+- Hero section:
+  - Big heading: "Analyze Any X Account"
+  - Subtext: "AI-powered scoring for influence, trust, and engagement"
+  - Input + Analyze button
+- Below:
+  - Feature cards (Score, Analytics, Growth)
+- Footer minimal
+
+DASHBOARD PAGE:
+- Show:
+  - Score card (large number)
+  - Analytics grid (followers, engagement, growth)
+  - Simple charts (mock or real)
+- Clean grid layout
+
+TECH STACK:
+- Next.js 16 (App Router)
+- Tailwind CSS
+- Firebase (Auth + Firestore)
+- API route: /api/analyze
+
+FUNCTIONALITY:
+- Create API route that returns mock Twitter data
+- Later replace with real API
+- Implement loading state
+- Error handling
+
+DESIGN DETAILS:
+- Rounded corners (xl or 2xl)
+- Subtle gray borders
+- Background gradient (very soft)
+- Green primary button in dark mode
+- Smooth transitions (duration-300)
+
+DEPLOYMENT:
+- Must be fully deployable on Vercel
+- No server-side heavy dependencies
+
+EXTRA:
+- Add reusable components:
+  - Button
+  - Card
+  - Input
+- Maintain clean folder structure
+
+Goal:
+Create a premium, minimal, fast, and modern SaaS app that feels like a high-end AI tool.

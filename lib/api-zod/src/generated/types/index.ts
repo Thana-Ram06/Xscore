@@ -6,4 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./analyzeRequest";
+export * from "./analyzeResult";
+export * from "./errorResponse";
 export * from "./healthStatus";
+export * from "./searchRecord";

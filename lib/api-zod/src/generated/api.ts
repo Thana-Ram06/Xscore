@@ -14,3 +14,60 @@ import * as zod from "zod";
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
 });
+
+/**
+ * Fetches and calculates influence score for a given X username
+ * @summary Analyze an X account
+ */
+export const AnalyzeAccountBody = zod.object({
+  username: zod.string().describe("X username (without @)"),
+});
+
+export const AnalyzeAccountResponse = zod.object({
+  username: zod.string(),
+  score: zod.number().describe("Influence score 0-1000"),
+  followers: zod.number(),
+  following: zod.number(),
+  tweets: zod.number(),
+  engagementRate: zod.number().describe("Engagement rate as a percentage"),
+  growthRate: zod.number().describe("Monthly growth rate as a percentage"),
+  avgLikes: zod.number(),
+  avgRetweets: zod.number(),
+  avgReplies: zod.number(),
+  tier: zod.string().describe("Influence tier (Nano, Micro, Mid, Macro, Mega)"),
+  createdAt: zod.coerce.date(),
+});
+
+/**
+ * Returns list of previous searches stored in database
+ * @summary Get search history
+ */
+export const GetSearchHistoryResponseItem = zod.object({
+  id: zod.number(),
+  username: zod.string(),
+  score: zod.number(),
+  followers: zod.number(),
+  engagementRate: zod.number(),
+  growthRate: zod.number(),
+  tier: zod.string(),
+  searchedAt: zod.coerce.date(),
+});
+export const GetSearchHistoryResponse = zod.array(GetSearchHistoryResponseItem);
+
+/**
+ * @summary Get a specific search record
+ */
+export const GetSearchByIdParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetSearchByIdResponse = zod.object({
+  id: zod.number(),
+  username: zod.string(),
+  score: zod.number(),
+  followers: zod.number(),
+  engagementRate: zod.number(),
+  growthRate: zod.number(),
+  tier: zod.string(),
+  searchedAt: zod.coerce.date(),
+});

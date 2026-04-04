@@ -10,6 +10,10 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: analyze
+    description: X account analysis operations
+  - name: searches
+    description: Search history operations
 paths:
   /healthz:
     get:
@@ -24,6 +28,80 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /analyze:
+    post:
+      operationId: analyzeAccount
+      tags: [analyze]
+      summary: Analyze an X account
+      description: Fetches and calculates influence score for a given X username
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnalyzeRequest"
+      responses:
+        "200":
+          description: Analysis result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyzeResult"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Username not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /searches:
+    get:
+      operationId: getSearchHistory
+      tags: [searches]
+      summary: Get search history
+      description: Returns list of previous searches stored in database
+      responses:
+        "200":
+          description: List of previous searches
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SearchRecord"
+
+  /searches/{id}:
+    get:
+      operationId: getSearchById
+      tags: [searches]
+      summary: Get a specific search record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Search record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchRecord"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +112,98 @@ components:
       required:
         - status
 
+    AnalyzeRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          description: X username (without @)
+      required:
+        - username
+
+    AnalyzeResult:
+      type: object
+      properties:
+        username:
+          type: string
+        score:
+          type: number
+          description: Influence score 0-1000
+        followers:
+          type: integer
+        following:
+          type: integer
+        tweets:
+          type: integer
+        engagementRate:
+          type: number
+          description: Engagement rate as a percentage
+        growthRate:
+          type: number
+          description: Monthly growth rate as a percentage
+        avgLikes:
+          type: number
+        avgRetweets:
+          type: number
+        avgReplies:
+          type: number
+        tier:
+          type: string
+          description: Influence tier (Nano, Micro, Mid, Macro, Mega)
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - username
+        - score
+        - followers
+        - following
+        - tweets
+        - engagementRate
+        - growthRate
+        - avgLikes
+        - avgRetweets
+        - avgReplies
+        - tier
+        - createdAt
+
+    SearchRecord:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        score:
+          type: number
+        followers:
+          type: integer
+        engagementRate:
+          type: number
+        growthRate:
+          type: number
+        tier:
+          type: string
+        searchedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - username
+        - score
+        - followers
+        - engagementRate
+        - growthRate
+        - tier
+        - searchedAt
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+      required:
+        - error
+        - message

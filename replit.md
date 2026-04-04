@@ -16,6 +16,24 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
 
+## Artifacts
+
+### XScore (`artifacts/xscore`)
+- React + Vite frontend at `/`
+- AI-powered X (Twitter) influence scoring SaaS
+- Dark mode default with light mode toggle
+- Instrument Serif headings, Inter body text
+- Pages: Homepage (`/`), Dashboard (`/dashboard/:username`), Search Detail (`/search/:id`)
+
+### API Server (`artifacts/api-server`)
+- Express 5 backend at `/api`
+- Routes: POST `/api/analyze`, GET `/api/searches`, GET `/api/searches/:id`
+- Generates mock Twitter analytics data, calculates influence score
+
+## Database Schema
+
+- `searches` table: stores previous analysis results (username, score, followers, engagementRate, growthRate, tier, etc.)
+
 ## Key Commands
 
 - `pnpm run typecheck` — full typecheck across all packages

@@ -5,14 +5,6 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-export interface HealthStatus {
-  status: string;
-}
-
-export interface AnalyzeRequest {
-  /** X username (without @) */
-  username: string;
-}
 
 export interface AnalyzeResult {
   username: string;
@@ -30,21 +22,5 @@ export interface AnalyzeResult {
   avgReplies: number;
   /** Influence tier (Nano, Micro, Mid, Macro, Mega) */
   tier: string;
-  createdAt: string;
-}
-
-export interface SearchRecord {
-  id: number;
-  username: string;
-  score: number;
-  followers: number;
-  engagementRate: number;
-  growthRate: number;
-  tier: string;
-  searchedAt: string;
-}
-
-export interface ErrorResponse {
-  error: string;
-  message: string;
+  createdAt: Date;
 }
