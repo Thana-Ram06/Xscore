@@ -1,0 +1,113 @@
+Upgrade the existing Next.js 16 + Tailwind CSS project UI to a premium, modern SaaS interface inspired by tpot.cc and high-end AI tools.
+
+GOAL:
+Make the UI feel extremely clean, minimal, and premium. Focus on typography, spacing, and subtle interactions. Avoid clutter, heavy shadows, or outdated UI patterns.
+
+DESIGN SYSTEM:
+
+Typography:
+- Use "Instrument Serif" for all main headings (hero, score, titles)
+- Use "Inter" for body text and UI elements
+- Large, bold hero typography with tight tracking
+- Maintain excellent readability
+
+Color & Theme:
+- Default to dark mode
+- Background: deep black (#000) with subtle radial gradient
+- Cards: neutral-900 with soft borders (neutral-800)
+- Primary color: green (#22c55e)
+- Text:
+  - Primary: white
+  - Secondary: gray-400
+- Avoid bright or saturated colors except green accents
+
+Layout:
+- Center-aligned layout across all pages
+- Max width: 1200px (max-w-6xl mx-auto)
+- Generous vertical spacing (py-20 to py-24)
+- Use grid layout for dashboard
+- Maintain strong visual hierarchy
+
+HOMEPAGE IMPROVEMENTS:
+
+Hero Section:
+- Large heading: "Analyze Any X Account"
+- Subtext below with max width
+- Input + button inside a rounded container
+- Add subtle hover and focus states
+
+Input Design:
+- Transparent background
+- Rounded-xl container
+- Border: neutral-800
+- Focus: slight border highlight
+
+Button Design:
+- Green button with black text
+- Rounded-lg
+- Hover: slightly brighter green
+- Add smooth transition (duration-300)
+- Add hover scale effect (scale 1.02)
+
+Add micro-interactions:
+- Smooth transitions everywhere
+- Hover states on cards and buttons
+- No abrupt UI changes
+
+DASHBOARD PAGE:
+
+Structure:
+- Top: Large score card (centered or prominent)
+- Below: grid with analytics cards:
+  - Followers
+  - Engagement Rate
+  - Growth
+- Optional: chart placeholder
+
+Score Card:
+- Large number (text-5xl or bigger)
+- Use serif font
+- Add label + status (e.g. Excellent)
+
+Cards:
+- Rounded-2xl
+- Border-based design (no shadows)
+- Subtle hover border change
+- Clean spacing inside (p-6)
+
+ANIMATIONS:
+
+- Use Tailwind transitions:
+  transition-all duration-300 ease-in-out
+- Add hover scale:
+  hover:scale-[1.02]
+- Keep animations subtle and fast
+
+COMPONENTIZATION:
+
+Refactor UI into reusable components:
+- Button.tsx
+- Input.tsx
+- Card.tsx
+
+Each component should:
+- Follow consistent design rules
+- Accept props (children, className, etc.)
+
+UX IMPROVEMENTS:
+
+- Add loading state for "Analyze" button
+- Add smooth state transitions
+- Ensure mobile responsiveness
+- Maintain consistent spacing system
+
+DO NOT:
+- Use heavy shadows
+- Overuse gradients
+- Add unnecessary animations
+- Clutter UI with too many elements
+
+FINAL RESULT:
+The app should feel like a high-end SaaS product with a clean, minimal, and premium aesthetic similar to tpot.cc, with strong typography and spacing.
+
+Focus on polish, alignment, and visual balance over adding more features.

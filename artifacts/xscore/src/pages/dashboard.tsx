@@ -1,17 +1,55 @@
 import { useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { Layout } from "@/components/Layout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { AnimatedCounter } from "@/components/AnimatedCounter";
 import { useAnalyzeAccount, useGetSearchHistory } from "@workspace/api-client-react";
-import { ArrowUpRight, ArrowDownRight, Users, MessageCircle, TrendingUp, History, Twitter } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
+import {
+  ArrowUpRight,
+  ArrowDownRight,
+  Users,
+  MessageCircle,
+  TrendingUp,
+  History,
+  Heart,
+  Repeat2,
+  ChevronLeft,
+  Loader2,
+} from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+
+function getScoreLabel(score: number): string {
+  if (score >= 850) return "Elite";
+  if (score >= 650) return "Excellent";
+  if (score >= 400) return "Strong";
+  if (score >= 200) return "Growing";
+  return "Emerging";
+}
+
+function StatCard({
+  label,
+  value,
+  icon,
+  accent,
+}: {
+  label: string;
+  value: string;
+  icon: React.ReactNode;
+  accent: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-border bg-card p-6 hover:border-primary/30 hover:scale-[1.02] transition-all duration-300 ease-in-out">
+      <div className={`h-9 w-9 rounded-lg flex items-center justify-center mb-4 ${accent}`}>
+        {icon}
+      </div>
+      <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">{label}</p>
+      <p className="text-2xl font-serif font-bold">{value}</p>
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const { username } = useParams<{ username: string }>();
-  
+
   const { mutate: analyze, data: analyzeData, isPending: isAnalyzing, error } = useAnalyzeAccount();
   const { data: historyData, isLoading: isLoadingHistory } = useGetSearchHistory();
 
@@ -25,157 +63,203 @@ export default function Dashboard() {
 
   return (
     <Layout>
-      <div className="container max-w-5xl mx-auto px-4 py-8 space-y-8">
-        {/* Profile Header & Main Score */}
+      <div className="max-w-6xl mx-auto w-full px-4 py-10 space-y-8">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors duration-200"
+          data-testid="link-back"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          New analysis
+        </Link>
+
+        {/* Score card */}
         {isAnalyzing ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Skeleton className="h-[300px] md:col-span-2 rounded-2xl" />
-            <Skeleton className="h-[300px] rounded-2xl" />
+          <div className="rounded-2xl border border-border bg-card p-12 flex items-center justify-center min-h-[280px]">
+            <div className="flex flex-col items-center gap-4 text-muted-foreground">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-sm">Analyzing @{username}...</p>
+            </div>
           </div>
         ) : error ? (
-          <Card className="rounded-2xl border-destructive/50 bg-destructive/10">
-            <CardContent className="p-12 text-center">
-              <h2 className="text-2xl font-serif text-destructive mb-2">Analysis Failed</h2>
-              <p className="text-muted-foreground">Could not fetch data for @{username}. They might not exist or be private.</p>
-              <Link href="/">
-                <span className="mt-6 inline-block text-primary hover:underline cursor-pointer">Return Home</span>
-              </Link>
-            </CardContent>
-          </Card>
+          <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-12 text-center">
+            <h2 className="text-2xl font-serif text-destructive mb-2">Analysis Failed</h2>
+            <p className="text-muted-foreground text-sm">Could not fetch data for @{username}.</p>
+            <Link href="/" className="mt-6 inline-block text-primary text-sm hover:underline">
+              Return home
+            </Link>
+          </div>
         ) : analyzeData ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Score Card */}
-            <Card className="md:col-span-2 rounded-2xl border-border bg-card/50 backdrop-blur-sm overflow-hidden relative">
-              <div className="absolute top-0 right-0 p-8 opacity-5">
-                <Twitter className="w-64 h-64" />
-              </div>
-              <CardContent className="p-8 md:p-12 relative z-10 flex flex-col h-full justify-between">
-                <div className="flex items-center justify-between mb-8">
+          <>
+            {/* Main score card */}
+            <div className="rounded-2xl border border-border bg-card overflow-hidden">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-0 divide-y md:divide-y-0 md:divide-x divide-border">
+                {/* Left: score */}
+                <div className="md:col-span-3 p-8 md:p-12 flex flex-col justify-between gap-8">
+                  {/* Username & tier */}
                   <div className="flex items-center gap-4">
-                    <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center border-2 border-primary/20">
-                      <span className="text-2xl font-serif">
-                        {analyzeData.username.charAt(0).toUpperCase()}
-                      </span>
+                    <div className="h-12 w-12 rounded-full bg-primary/10 text-primary flex items-center justify-center font-serif text-xl font-medium shrink-0">
+                      {analyzeData.username.charAt(0).toUpperCase()}
                     </div>
                     <div>
-                      <h2 className="text-3xl font-bold font-serif flex items-center gap-3">
-                        @{analyzeData.username}
-                      </h2>
-                      <Badge variant="secondary" className="mt-1 bg-primary/10 text-primary hover:bg-primary/20 border-primary/20">
+                      <p className="text-xl font-serif font-semibold">@{analyzeData.username}</p>
+                      <span className="inline-block mt-1 text-xs px-2.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-medium">
                         {analyzeData.tier} Influencer
-                      </Badge>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Score */}
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-widest mb-3">
+                      XScore Index
+                    </p>
+                    <div className="flex items-end gap-4 flex-wrap">
+                      <div className="flex items-baseline gap-1">
+                        <AnimatedCounter
+                          value={Math.round(analyzeData.score)}
+                          className="text-7xl md:text-9xl font-serif font-bold leading-none text-primary"
+                        />
+                        <span className="text-2xl md:text-4xl text-muted-foreground">/1000</span>
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <span className="text-base font-serif text-foreground font-medium">
+                          {getScoreLabel(analyzeData.score)}
+                        </span>
+                        <div
+                          className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg ${
+                            analyzeData.growthRate >= 0
+                              ? "bg-primary/10 text-primary"
+                              : "bg-red-500/10 text-red-400"
+                          }`}
+                        >
+                          {analyzeData.growthRate >= 0 ? (
+                            <ArrowUpRight className="h-3.5 w-3.5" />
+                          ) : (
+                            <ArrowDownRight className="h-3.5 w-3.5" />
+                          )}
+                          {Math.abs(analyzeData.growthRate).toFixed(1)}% growth
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="flex flex-col md:flex-row items-end md:items-baseline gap-4 md:gap-8 mt-auto">
+                {/* Right: quick stats */}
+                <div className="md:col-span-2 p-8 flex flex-col justify-center gap-6">
                   <div>
-                    <p className="text-sm text-muted-foreground font-medium uppercase tracking-wider mb-2">XScore Index</p>
-                    <div className="text-7xl md:text-9xl font-serif font-bold text-foreground leading-none tracking-tighter flex items-baseline">
-                      <AnimatedCounter value={analyzeData.score} className="text-primary drop-shadow-[0_0_15px_rgba(var(--primary),0.3)]" />
-                      <span className="text-3xl md:text-5xl text-muted-foreground ml-2">/1000</span>
-                    </div>
-                  </div>
-                  
-                  <div className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium ${analyzeData.growthRate >= 0 ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
-                    {analyzeData.growthRate >= 0 ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
-                    <span>{Math.abs(analyzeData.growthRate)}% Growth</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Quick Stats Grid */}
-            <div className="flex flex-col gap-4">
-              <Card className="rounded-2xl flex-1 bg-card/50 backdrop-blur-sm">
-                <CardContent className="p-6 flex items-center gap-4 h-full">
-                  <div className="p-3 bg-blue-500/10 text-blue-500 rounded-xl">
-                    <Users className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Followers</p>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Followers</p>
                     <p className="text-2xl font-serif font-bold">{analyzeData.followers.toLocaleString()}</p>
                   </div>
-                </CardContent>
-              </Card>
-              <Card className="rounded-2xl flex-1 bg-card/50 backdrop-blur-sm">
-                <CardContent className="p-6 flex items-center gap-4 h-full">
-                  <div className="p-3 bg-purple-500/10 text-purple-500 rounded-xl">
-                    <MessageCircle className="h-6 w-6" />
-                  </div>
+                  <div className="border-t border-border/50" />
                   <div>
-                    <p className="text-sm text-muted-foreground mb-1">Engagement</p>
-                    <p className="text-2xl font-serif font-bold">{analyzeData.engagementRate.toFixed(2)}%</p>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Following</p>
+                    <p className="text-2xl font-serif font-bold">{analyzeData.following.toLocaleString()}</p>
                   </div>
-                </CardContent>
-              </Card>
-              <Card className="rounded-2xl flex-1 bg-card/50 backdrop-blur-sm">
-                <CardContent className="p-6 flex items-center gap-4 h-full">
-                  <div className="p-3 bg-orange-500/10 text-orange-500 rounded-xl">
-                    <TrendingUp className="h-6 w-6" />
-                  </div>
+                  <div className="border-t border-border/50" />
                   <div>
-                    <p className="text-sm text-muted-foreground mb-1">Avg Likes</p>
-                    <p className="text-2xl font-serif font-bold">{analyzeData.avgLikes.toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Total Tweets</p>
+                    <p className="text-2xl font-serif font-bold">{analyzeData.tweets.toLocaleString()}</p>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             </div>
-          </div>
+
+            {/* Analytics grid */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <StatCard
+                label="Engagement Rate"
+                value={`${analyzeData.engagementRate.toFixed(2)}%`}
+                icon={<MessageCircle className="h-4 w-4" />}
+                accent="bg-primary/10 text-primary"
+              />
+              <StatCard
+                label="Avg Likes"
+                value={analyzeData.avgLikes >= 1000
+                  ? `${(analyzeData.avgLikes / 1000).toFixed(1)}k`
+                  : Math.round(analyzeData.avgLikes).toString()}
+                icon={<Heart className="h-4 w-4" />}
+                accent="bg-pink-500/10 text-pink-400"
+              />
+              <StatCard
+                label="Avg Retweets"
+                value={analyzeData.avgRetweets >= 1000
+                  ? `${(analyzeData.avgRetweets / 1000).toFixed(1)}k`
+                  : Math.round(analyzeData.avgRetweets).toString()}
+                icon={<Repeat2 className="h-4 w-4" />}
+                accent="bg-blue-500/10 text-blue-400"
+              />
+              <StatCard
+                label="Avg Replies"
+                value={analyzeData.avgReplies >= 1000
+                  ? `${(analyzeData.avgReplies / 1000).toFixed(1)}k`
+                  : Math.round(analyzeData.avgReplies).toString()}
+                icon={<TrendingUp className="h-4 w-4" />}
+                accent="bg-orange-500/10 text-orange-400"
+              />
+            </div>
+          </>
         ) : null}
 
-        {/* History Section */}
-        <div className="mt-12">
-          <div className="flex items-center gap-2 mb-6">
-            <History className="h-5 w-5 text-muted-foreground" />
-            <h3 className="text-2xl font-serif">Recent Analyses</h3>
+        {/* Search history */}
+        <div>
+          <div className="flex items-center gap-2 mb-4">
+            <History className="h-4 w-4 text-muted-foreground" />
+            <h3 className="font-serif text-xl">Recent Analyses</h3>
           </div>
 
-          <Card className="rounded-2xl border-border bg-card/50 backdrop-blur-sm">
-            <div className="divide-y divide-border/50">
-              {isLoadingHistory ? (
-                Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="p-4 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <Skeleton className="h-10 w-10 rounded-full" />
-                      <div className="space-y-2">
-                        <Skeleton className="h-4 w-24" />
-                        <Skeleton className="h-3 w-16" />
-                      </div>
+          <div className="rounded-2xl border border-border bg-card overflow-hidden divide-y divide-border/50">
+            {isLoadingHistory ? (
+              Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="p-4 flex items-center justify-between animate-pulse">
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-full bg-muted" />
+                    <div className="space-y-2">
+                      <div className="h-3.5 w-24 bg-muted rounded" />
+                      <div className="h-3 w-16 bg-muted rounded" />
                     </div>
-                    <Skeleton className="h-8 w-16" />
                   </div>
-                ))
-              ) : recentHistory.length > 0 ? (
-                recentHistory.map((record) => (
-                  <Link href={`/search/${record.id}`} key={record.id}>
-                    <div className="p-4 hover:bg-muted/50 transition-colors flex items-center justify-between cursor-pointer group" data-testid={`history-item-${record.id}`}>
-                      <div className="flex items-center gap-4">
-                        <div className="h-10 w-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-serif text-lg font-medium group-hover:scale-110 transition-transform">
-                          {record.username.charAt(0).toUpperCase()}
-                        </div>
-                        <div>
-                          <p className="font-semibold font-serif text-lg">@{record.username}</p>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span>{formatDistanceToNow(new Date(record.searchedAt))} ago</span>
-                            <span>&bull;</span>
-                            <span>{record.tier}</span>
-                          </div>
-                        </div>
+                  <div className="h-6 w-12 bg-muted rounded" />
+                </div>
+              ))
+            ) : recentHistory.length > 0 ? (
+              recentHistory.map((record) => (
+                <Link href={`/search/${record.id}`} key={record.id}>
+                  <div
+                    className="p-4 flex items-center justify-between hover:bg-muted/40 transition-colors duration-200 cursor-pointer group"
+                    data-testid={`history-item-${record.id}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-9 w-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-serif text-base font-medium group-hover:bg-primary/20 transition-colors duration-200">
+                        {record.username.charAt(0).toUpperCase()}
                       </div>
-                      <div className="text-right">
-                        <p className="font-serif text-2xl font-bold text-primary">{record.score}</p>
+                      <div>
+                        <p className="font-medium text-sm">@{record.username}</p>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                          <span>{record.tier}</span>
+                          <span>&middot;</span>
+                          <span>{formatDistanceToNow(new Date(record.searchedAt))} ago</span>
+                        </div>
                       </div>
                     </div>
-                  </Link>
-                ))
-              ) : (
-                <div className="p-8 text-center text-muted-foreground">
-                  No previous searches found.
-                </div>
-              )}
-            </div>
-          </Card>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-muted-foreground hidden sm:block">
+                        {record.followers.toLocaleString()} followers
+                      </span>
+                      <span className="font-serif text-xl font-bold text-primary" data-testid={`score-${record.id}`}>
+                        {Math.round(record.score)}
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              ))
+            ) : (
+              <div className="py-12 text-center">
+                <Users className="h-8 w-8 text-muted-foreground/40 mx-auto mb-3" />
+                <p className="text-sm text-muted-foreground">No previous searches found.</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </Layout>
