@@ -39,12 +39,12 @@ function getTier(followers: number): string {
 
 interface MockData {
   username: string;
+  score: number;
   followers: number;
   following: number;
   tweets: number;
   likes: number;
   engagementRate: number;
-  score: number;
   growthRate: number;
   avgLikes: number;
   avgRetweets: number;
@@ -66,10 +66,7 @@ function simulateXData(username: string): MockData {
   const tweets = Math.floor(rand(50, 50_000));
   const likes = Math.floor(rand(1_000, followers * 10));
 
-  const engagementRate = parseFloat(
-    Math.min(rand(0.5, 8), 10).toFixed(2)
-  );
-
+  const engagementRate = parseFloat(Math.min(rand(0.5, 8), 10).toFixed(2));
   const rawScore = (followers * engagementRate) / 100;
   const score = parseFloat(Math.min(rawScore, 1000).toFixed(1));
 
@@ -80,12 +77,12 @@ function simulateXData(username: string): MockData {
 
   return {
     username,
+    score,
     followers,
     following,
     tweets,
     likes,
     engagementRate,
-    score,
     growthRate,
     avgLikes: parseFloat(avgLikes.toFixed(1)),
     avgRetweets: parseFloat(avgRetweets.toFixed(1)),
@@ -95,7 +92,8 @@ function simulateXData(username: string): MockData {
   };
 }
 
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const delay = (ms: number) =>
+  new Promise((resolve) => setTimeout(resolve, ms));
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
@@ -110,10 +108,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       : "";
 
   if (!rawUsername) {
-    res.status(400).json({
-      error: "Bad Request",
-      message: "username is required",
-    });
+    res
+      .status(400)
+      .json({ error: "Bad Request", message: "username is required" });
     return;
   }
 
@@ -151,10 +148,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   res.status(200).json({
     username: data.username,
+    score: data.score,
     followers: data.followers,
     following: data.following,
     tweets: data.tweets,
     engagementRate: data.engagementRate,
-    score: data.score,
+    growthRate: data.growthRate,
+    avgLikes: data.avgLikes,
+    avgRetweets: data.avgRetweets,
+    avgReplies: data.avgReplies,
+    tier: data.tier,
+    createdAt: data.createdAt,
   });
 }
