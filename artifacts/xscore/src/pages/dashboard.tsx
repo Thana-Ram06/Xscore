@@ -14,15 +14,48 @@ import {
   Repeat2,
   ChevronLeft,
   Loader2,
+  AlertCircle,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 function getScoreLabel(score: number): string {
-  if (score >= 850) return "Elite";
-  if (score >= 650) return "Excellent";
-  if (score >= 400) return "Strong";
-  if (score >= 200) return "Growing";
-  return "Emerging";
+  if (score >= 700) return "Excellent";
+  if (score >= 300) return "متوسط";
+  return "Low";
+}
+
+function getScorePalette(score: number): {
+  label: string;
+  bar: string;
+  badge: string;
+  text: string;
+} {
+  if (score >= 700)
+    return {
+      label: "text-primary",
+      bar: "bg-primary",
+      badge: "bg-primary/10 text-primary border-primary/20",
+      text: "text-primary",
+    };
+  if (score >= 300)
+    return {
+      label: "text-amber-400",
+      bar: "bg-amber-400",
+      badge: "bg-amber-400/10 text-amber-400 border-amber-400/20",
+      text: "text-amber-400",
+    };
+  return {
+    label: "text-red-400",
+    bar: "bg-red-400",
+    badge: "bg-red-400/10 text-red-400 border-red-400/20",
+    text: "text-red-400",
+  };
+}
+
+function formatNum(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return n.toLocaleString();
 }
 
 function StatCard({
@@ -50,7 +83,13 @@ function StatCard({
 export default function Dashboard() {
   const { username } = useParams<{ username: string }>();
 
-  const { mutate: analyze, data: analyzeData, isPending: isAnalyzing, error } = useAnalyzeAccount();
+  const {
+    mutate: analyze,
+    data: analyzeData,
+    isPending: isAnalyzing,
+    error,
+  } = useAnalyzeAccount();
+
   const { data: historyData, isLoading: isLoadingHistory } = useGetSearchHistory();
 
   useEffect(() => {
@@ -60,6 +99,7 @@ export default function Dashboard() {
   }, [username, analyze]);
 
   const recentHistory = historyData?.slice(0, 10) || [];
+  const palette = analyzeData ? getScorePalette(analyzeData.score) : null;
 
   return (
     <Layout>
@@ -78,18 +118,33 @@ export default function Dashboard() {
           <div className="rounded-2xl border border-border bg-card p-12 flex items-center justify-center min-h-[280px]">
             <div className="flex flex-col items-center gap-4 text-muted-foreground">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm">Analyzing @{username}...</p>
+              <p className="text-sm">Analyzing @{username}…</p>
             </div>
           </div>
         ) : error ? (
-          <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-12 text-center">
-            <h2 className="text-2xl font-serif text-destructive mb-2">Analysis Failed</h2>
-            <p className="text-muted-foreground text-sm">Could not fetch data for @{username}.</p>
-            <Link href="/" className="mt-6 inline-block text-primary text-sm hover:underline">
+          <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-12 flex flex-col items-center text-center gap-4">
+            <AlertCircle className="h-10 w-10 text-destructive/70" />
+            <div>
+              <h2 className="text-2xl font-serif text-destructive mb-1">Analysis Failed</h2>
+              <p className="text-muted-foreground text-sm">
+                Could not fetch data for @{username}. Please try again.
+              </p>
+            </div>
+            <Link
+              href="/"
+              className="mt-2 px-5 py-2 rounded-lg border border-border text-sm hover:border-primary/50 transition-colors duration-200"
+            >
               Return home
             </Link>
           </div>
-        ) : analyzeData ? (
+        ) : !analyzeData ? (
+          <div className="rounded-2xl border border-border bg-card p-12 text-center">
+            <p className="text-muted-foreground text-sm">No data available. Try a new search.</p>
+            <Link href="/" className="mt-4 inline-block text-primary text-sm hover:underline">
+              Search an account
+            </Link>
+          </div>
+        ) : (
           <>
             {/* Main score card */}
             <div className="rounded-2xl border border-border bg-card overflow-hidden">
@@ -109,7 +164,7 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {/* Score */}
+                  {/* Score + label */}
                   <div>
                     <p className="text-xs text-muted-foreground uppercase tracking-widest mb-3">
                       XScore Index
@@ -118,14 +173,20 @@ export default function Dashboard() {
                       <div className="flex items-baseline gap-1">
                         <AnimatedCounter
                           value={Math.round(analyzeData.score)}
-                          className="text-7xl md:text-9xl font-serif font-bold leading-none text-primary"
+                          className={`text-7xl md:text-9xl font-serif font-bold leading-none ${palette!.label}`}
                         />
                         <span className="text-2xl md:text-4xl text-muted-foreground">/1000</span>
                       </div>
+
                       <div className="flex flex-col gap-1.5">
-                        <span className="text-base font-serif text-foreground font-medium">
+                        {/* Tier label badge */}
+                        <span
+                          className={`inline-flex items-center text-sm font-semibold px-3 py-1 rounded-full border ${palette!.badge}`}
+                          data-testid="score-label"
+                        >
                           {getScoreLabel(analyzeData.score)}
                         </span>
+                        {/* Growth rate */}
                         <div
                           className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg ${
                             analyzeData.growthRate >= 0
@@ -142,24 +203,47 @@ export default function Dashboard() {
                         </div>
                       </div>
                     </div>
+
+                    {/* Score progress bar */}
+                    <div className="mt-5 h-1.5 w-full max-w-xs rounded-full bg-border overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-700 ${palette!.bar}`}
+                        style={{ width: `${(analyzeData.score / 1000) * 100}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1.5">
+                      {Math.round(analyzeData.score)} / 1000 points
+                    </p>
                   </div>
                 </div>
 
                 {/* Right: quick stats */}
                 <div className="md:col-span-2 p-8 flex flex-col justify-center gap-6">
                   <div>
-                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Followers</p>
-                    <p className="text-2xl font-serif font-bold">{analyzeData.followers.toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">
+                      Followers
+                    </p>
+                    <p className="text-2xl font-serif font-bold" data-testid="stat-followers">
+                      {formatNum(analyzeData.followers)}
+                    </p>
                   </div>
                   <div className="border-t border-border/50" />
                   <div>
-                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Following</p>
-                    <p className="text-2xl font-serif font-bold">{analyzeData.following.toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">
+                      Following
+                    </p>
+                    <p className="text-2xl font-serif font-bold">
+                      {formatNum(analyzeData.following)}
+                    </p>
                   </div>
                   <div className="border-t border-border/50" />
                   <div>
-                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Total Tweets</p>
-                    <p className="text-2xl font-serif font-bold">{analyzeData.tweets.toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">
+                      Total Tweets
+                    </p>
+                    <p className="text-2xl font-serif font-bold">
+                      {formatNum(analyzeData.tweets)}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -175,31 +259,25 @@ export default function Dashboard() {
               />
               <StatCard
                 label="Avg Likes"
-                value={analyzeData.avgLikes >= 1000
-                  ? `${(analyzeData.avgLikes / 1000).toFixed(1)}k`
-                  : Math.round(analyzeData.avgLikes).toString()}
+                value={formatNum(Math.round(analyzeData.avgLikes))}
                 icon={<Heart className="h-4 w-4" />}
                 accent="bg-pink-500/10 text-pink-400"
               />
               <StatCard
                 label="Avg Retweets"
-                value={analyzeData.avgRetweets >= 1000
-                  ? `${(analyzeData.avgRetweets / 1000).toFixed(1)}k`
-                  : Math.round(analyzeData.avgRetweets).toString()}
+                value={formatNum(Math.round(analyzeData.avgRetweets))}
                 icon={<Repeat2 className="h-4 w-4" />}
                 accent="bg-blue-500/10 text-blue-400"
               />
               <StatCard
                 label="Avg Replies"
-                value={analyzeData.avgReplies >= 1000
-                  ? `${(analyzeData.avgReplies / 1000).toFixed(1)}k`
-                  : Math.round(analyzeData.avgReplies).toString()}
+                value={formatNum(Math.round(analyzeData.avgReplies))}
                 icon={<TrendingUp className="h-4 w-4" />}
                 accent="bg-orange-500/10 text-orange-400"
               />
             </div>
           </>
-        ) : null}
+        )}
 
         {/* Search history */}
         <div>
@@ -223,36 +301,47 @@ export default function Dashboard() {
                 </div>
               ))
             ) : recentHistory.length > 0 ? (
-              recentHistory.map((record) => (
-                <Link href={`/search/${record.id}`} key={record.id}>
-                  <div
-                    className="p-4 flex items-center justify-between hover:bg-muted/40 transition-colors duration-200 cursor-pointer group"
-                    data-testid={`history-item-${record.id}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="h-9 w-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-serif text-base font-medium group-hover:bg-primary/20 transition-colors duration-200">
-                        {record.username.charAt(0).toUpperCase()}
+              recentHistory.map((record) => {
+                const rp = getScorePalette(record.score);
+                return (
+                  <Link href={`/search/${record.id}`} key={record.id}>
+                    <div
+                      className="p-4 flex items-center justify-between hover:bg-muted/40 transition-colors duration-200 cursor-pointer group"
+                      data-testid={`history-item-${record.id}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-9 w-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-serif text-base font-medium group-hover:bg-primary/20 transition-colors duration-200">
+                          {record.username.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="font-medium text-sm">@{record.username}</p>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                            <span>{record.tier}</span>
+                            <span>&middot;</span>
+                            <span>{formatDistanceToNow(new Date(record.searchedAt))} ago</span>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium text-sm">@{record.username}</p>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                          <span>{record.tier}</span>
-                          <span>&middot;</span>
-                          <span>{formatDistanceToNow(new Date(record.searchedAt))} ago</span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-muted-foreground hidden sm:block">
+                          {formatNum(record.followers)} followers
+                        </span>
+                        <div className="flex flex-col items-end gap-0.5">
+                          <span
+                            className={`font-serif text-xl font-bold ${rp.text}`}
+                            data-testid={`score-${record.id}`}
+                          >
+                            {Math.round(record.score)}
+                          </span>
+                          <span className={`text-[10px] font-medium ${rp.text} opacity-80`}>
+                            {getScoreLabel(record.score)}
+                          </span>
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-muted-foreground hidden sm:block">
-                        {record.followers.toLocaleString()} followers
-                      </span>
-                      <span className="font-serif text-xl font-bold text-primary" data-testid={`score-${record.id}`}>
-                        {Math.round(record.score)}
-                      </span>
-                    </div>
-                  </div>
-                </Link>
-              ))
+                  </Link>
+                );
+              })
             ) : (
               <div className="py-12 text-center">
                 <Users className="h-8 w-8 text-muted-foreground/40 mx-auto mb-3" />
