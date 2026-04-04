@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { Pool } from "pg";
 
-// ─── Database ────────────────────────────────────────────────────────────────
+// ─── Database ─────────────────────────────────────────────────────────────────
 
 let pool: Pool | null = null;
 
@@ -31,7 +31,33 @@ async function ensureTable(db: Pool): Promise<void> {
   `);
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const RAPIDAPI_HOST = "twitter154.p.rapidapi.com";
+const API_TIMEOUT_MS = 8_000;
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface TwitterProfile {
+  username: string;
+  followers: number;
+  following: number;
+  tweets: number;
+  avgLikes: number;
+  avgReplies: number;
+  avgRetweets: number;
+  isReal: boolean;
+}
+
+interface ScoreBreakdown {
+  engagement: number;
+  followerQuality: number;
+  growth: number;
+  activity: number;
+  authority: number;
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getTier(followers: number): string {
   if (followers < 1_000) return "Nano";
@@ -41,7 +67,6 @@ function getTier(followers: number): string {
   return "Mega";
 }
 
-/** Seeded pseudo-random deterministic number in [min, max) */
 function makeRand(seed: number) {
   return (min: number, max: number): number => {
     const x = Math.sin(seed + min + max) * 10_000;
@@ -49,35 +74,17 @@ function makeRand(seed: number) {
   };
 }
 
-const delay = (ms: number) =>
-  new Promise((resolve) => setTimeout(resolve, ms));
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// ─── Scoring factors (each returns 0–100) ────────────────────────────────────
+// ─── Scoring factors (each 0–100) ────────────────────────────────────────────
 
-/**
- * Engagement Score (weight 35%)
- * Based on (avgLikes + avgReplies) / followers * 100.
- * Ceiling at 8% engagement = 100 points.
- */
-function calcEngagementScore(
-  avgLikes: number,
-  avgReplies: number,
-  followers: number
-): number {
+function calcEngagementScore(avgLikes: number, avgReplies: number, followers: number): number {
   if (followers === 0) return 0;
   const rate = ((avgLikes + avgReplies) / followers) * 100;
   return Math.min((rate / 8) * 100, 100);
 }
 
-/**
- * Follower Quality Score (weight 25%)
- * Penalises large accounts with suspiciously low engagement
- * (>10 K followers yet <1% ER → likely inflated audience).
- */
-function calcFollowerQualityScore(
-  followers: number,
-  engagementRate: number
-): number {
+function calcFollowerQualityScore(followers: number, engagementRate: number): number {
   if (followers > 10_000 && engagementRate < 1) {
     const penalty = (1 - engagementRate) * 50;
     return Math.max(5, 50 - penalty);
@@ -90,129 +97,139 @@ function calcFollowerQualityScore(
   return Math.min(sizeBonus + erBonus, 100);
 }
 
-/**
- * Growth Score (weight 15%)
- * Simulates steady organic growth vs artificial spikes.
- */
 function calcGrowthScore(rand: ReturnType<typeof makeRand>): number {
   const pattern = rand(0, 1);
-  if (pattern > 0.6) return rand(68, 95);   // Stable, organic
-  if (pattern > 0.3) return rand(42, 67);   // Moderate with spikes
-  return rand(15, 41);                       // Heavy spikes — penalised
+  if (pattern > 0.6) return rand(68, 95);
+  if (pattern > 0.3) return rand(42, 67);
+  return rand(15, 41);
 }
 
-/**
- * Activity Score (weight 15%)
- * Derived from estimated tweets per week.
- * Optimal cadence (5–20 / week) scores highest.
- */
 function calcActivityScore(tweets: number): number {
-  const tweetsPerWeek = tweets / 104; // ~2-year account lifespan
-  if (tweetsPerWeek < 0.5) return 15;
-  if (tweetsPerWeek < 2)   return 45;
-  if (tweetsPerWeek <= 5)  return 72;
-  if (tweetsPerWeek <= 20) return 100;
-  if (tweetsPerWeek <= 40) return 78;
-  if (tweetsPerWeek <= 70) return 55;
-  return 30; // Spam territory
+  const tpw = tweets / 104;
+  if (tpw < 0.5) return 15;
+  if (tpw < 2)   return 45;
+  if (tpw <= 5)  return 72;
+  if (tpw <= 20) return 100;
+  if (tpw <= 40) return 78;
+  if (tpw <= 70) return 55;
+  return 30;
 }
 
-/**
- * Authority Score (weight 10%)
- * followers / following ratio on a log scale.
- */
 function calcAuthorityScore(followers: number, following: number): number {
   if (following === 0) return 100;
   const ratio = followers / following;
   return Math.min((Math.log10(1 + ratio) / Math.log10(101)) * 100, 100);
 }
 
-// ─── Main simulator ───────────────────────────────────────────────────────────
+function buildScore(profile: TwitterProfile, rand: ReturnType<typeof makeRand>) {
+  const engagementRate = parseFloat(
+    Math.min(
+      ((profile.avgLikes + profile.avgReplies) / Math.max(profile.followers, 1)) * 100,
+      15
+    ).toFixed(2)
+  );
 
-interface ScoreBreakdown {
-  engagement: number;
-  followerQuality: number;
-  growth: number;
-  activity: number;
-  authority: number;
+  const breakdown: ScoreBreakdown = {
+    engagement:      parseFloat(calcEngagementScore(profile.avgLikes, profile.avgReplies, profile.followers).toFixed(1)),
+    followerQuality: parseFloat(calcFollowerQualityScore(profile.followers, engagementRate).toFixed(1)),
+    growth:          parseFloat(calcGrowthScore(rand).toFixed(1)),
+    activity:        parseFloat(calcActivityScore(profile.tweets).toFixed(1)),
+    authority:       parseFloat(calcAuthorityScore(profile.followers, profile.following).toFixed(1)),
+  };
+
+  const weightedRaw =
+    breakdown.engagement      * 0.35 +
+    breakdown.followerQuality * 0.25 +
+    breakdown.growth          * 0.15 +
+    breakdown.activity        * 0.15 +
+    breakdown.authority       * 0.10;
+
+  const score = parseFloat(Math.min(Math.max(weightedRaw * 10, 0), 1000).toFixed(1));
+
+  return { score, engagementRate, breakdown };
 }
 
-interface MockData {
-  username: string;
-  score: number;
-  followers: number;
-  following: number;
-  tweets: number;
-  engagementRate: number;
-  growthRate: number;
-  avgLikes: number;
-  avgRetweets: number;
-  avgReplies: number;
-  tier: string;
-  createdAt: string;
-  breakdown: ScoreBreakdown;
-}
+// ─── Mock data (deterministic fallback) ──────────────────────────────────────
 
-function simulateXData(username: string): MockData {
-  const seed = username
-    .split("")
-    .reduce((acc, c) => acc + c.charCodeAt(0), 0);
+function mockProfile(username: string): TwitterProfile {
+  const seed = username.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
   const rand = makeRand(seed);
 
-  // ── Raw metrics ──────────────────────────────────────────────────────────
-  const followers = Math.floor(rand(500, 2_000_000));
-  const following = Math.floor(rand(100, Math.min(followers * 0.8, 50_000)));
-  const tweets = Math.floor(rand(50, 50_000));
-
-  const avgLikes = rand(2, Math.min(followers * 0.08, 50_000));
-  const avgReplies = avgLikes * rand(0.05, 0.15);
+  const followers   = Math.floor(rand(500, 2_000_000));
+  const following   = Math.floor(rand(100, Math.min(followers * 0.8, 50_000)));
+  const tweets      = Math.floor(rand(50, 50_000));
+  const avgLikes    = rand(2, Math.min(followers * 0.08, 50_000));
+  const avgReplies  = avgLikes * rand(0.05, 0.15);
   const avgRetweets = avgLikes * rand(0.1, 0.3);
 
-  const engagementRate = parseFloat(
-    Math.min(((avgLikes + avgReplies) / followers) * 100, 15).toFixed(2)
-  );
-  const growthRate = parseFloat(rand(-5, 25).toFixed(2));
+  return { username, followers, following, tweets, avgLikes, avgReplies, avgRetweets, isReal: false };
+}
 
-  // ── Sub-scores (0–100) ───────────────────────────────────────────────────
-  const engagement = parseFloat(
-    calcEngagementScore(avgLikes, avgReplies, followers).toFixed(1)
-  );
-  const followerQuality = parseFloat(
-    calcFollowerQualityScore(followers, engagementRate).toFixed(1)
-  );
-  const growth = parseFloat(calcGrowthScore(rand).toFixed(1));
-  const activity = parseFloat(calcActivityScore(tweets).toFixed(1));
-  const authority = parseFloat(
-    calcAuthorityScore(followers, following).toFixed(1)
-  );
+// ─── Real Twitter data via RapidAPI ──────────────────────────────────────────
 
-  // ── Weighted composite → 0–1000 ──────────────────────────────────────────
-  const weightedRaw =
-    engagement * 0.35 +
-    followerQuality * 0.25 +
-    growth * 0.15 +
-    activity * 0.15 +
-    authority * 0.10;
+class TwitterApiError extends Error {
+  constructor(
+    public readonly code: "USER_NOT_FOUND" | "RATE_LIMIT" | "API_ERROR",
+    message: string
+  ) {
+    super(message);
+    this.name = "TwitterApiError";
+  }
+}
 
-  const score = parseFloat(
-    Math.min(Math.max(weightedRaw * 10, 0), 1000).toFixed(1)
-  );
+async function fetchTwitterProfile(username: string): Promise<TwitterProfile> {
+  const apiKey = process.env.TWITTER_API_KEY;
+  if (!apiKey) throw new Error("TWITTER_API_KEY not set");
 
-  return {
-    username,
-    score,
-    followers,
-    following,
-    tweets,
-    engagementRate,
-    growthRate,
-    avgLikes: parseFloat(avgLikes.toFixed(1)),
-    avgRetweets: parseFloat(avgRetweets.toFixed(1)),
-    avgReplies: parseFloat(avgReplies.toFixed(1)),
-    tier: getTier(followers),
-    createdAt: new Date().toISOString(),
-    breakdown: { engagement, followerQuality, growth, activity, authority },
+  const headers = {
+    "X-RapidAPI-Key":  apiKey,
+    "X-RapidAPI-Host": RAPIDAPI_HOST,
   };
+
+  // ── User profile ──────────────────────────────────────────────────────────
+  const userRes = await fetch(
+    `https://${RAPIDAPI_HOST}/user/details?username=${encodeURIComponent(username)}`,
+    { headers, signal: AbortSignal.timeout(API_TIMEOUT_MS) }
+  );
+
+  if (userRes.status === 404) throw new TwitterApiError("USER_NOT_FOUND", `@${username} not found on X`);
+  if (userRes.status === 429) throw new TwitterApiError("RATE_LIMIT", "X API rate limit reached");
+  if (!userRes.ok)            throw new TwitterApiError("API_ERROR", `Twitter API ${userRes.status}`);
+
+  const user = await userRes.json();
+
+  const followers       = user.follower_count  ?? user.followers_count ?? 0;
+  const following       = user.following_count ?? user.friends_count   ?? 0;
+  const tweets          = user.tweet_count     ?? user.statuses_count  ?? 0;
+  const resolvedUsername = user.username       ?? user.screen_name     ?? username;
+
+  // ── Recent tweets for engagement ──────────────────────────────────────────
+  let avgLikes = 0, avgReplies = 0, avgRetweets = 0;
+
+  try {
+    const tweetsRes = await fetch(
+      `https://${RAPIDAPI_HOST}/user/tweets?username=${encodeURIComponent(username)}&limit=10&includeReplies=false&includeFulltext=false`,
+      { headers, signal: AbortSignal.timeout(API_TIMEOUT_MS) }
+    );
+
+    if (tweetsRes.ok) {
+      const data = await tweetsRes.json();
+      const list: Record<string, number>[] = data.results ?? data.data ?? [];
+
+      if (list.length > 0) {
+        const avg = (k1: string, k2 = "") =>
+          list.reduce((s, t) => s + (Number(t[k1]) || Number(t[k2]) || 0), 0) / list.length;
+
+        avgLikes    = avg("favorite_count", "likes");
+        avgReplies  = avg("reply_count",    "replies");
+        avgRetweets = avg("retweet_count",  "retweets");
+      }
+    }
+  } catch {
+    // Tweets fetch failed — engagement stays at zero, scoring degrades gracefully
+  }
+
+  return { username: resolvedUsername, followers, following, tweets, avgLikes, avgReplies, avgRetweets, isReal: true };
 }
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
@@ -225,21 +242,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
   const rawUsername =
-    typeof body?.username === "string"
-      ? body.username.replace(/^@/, "").trim()
-      : "";
+    typeof body?.username === "string" ? body.username.replace(/^@/, "").trim() : "";
 
   if (!rawUsername) {
-    res
-      .status(400)
-      .json({ error: "Bad Request", message: "username is required" });
+    res.status(400).json({ error: "Bad Request", message: "username is required" });
     return;
   }
 
-  await delay(600);
+  // ── Fetch real data, fall back to mock ───────────────────────────────────
+  let profile: TwitterProfile;
+  let dataSource: "real" | "mock" = "real";
 
-  const data = simulateXData(rawUsername);
+  try {
+    profile = await fetchTwitterProfile(rawUsername);
+  } catch (err) {
+    if (err instanceof TwitterApiError) {
+      if (err.code === "USER_NOT_FOUND") {
+        res.status(404).json({ error: "Not Found", message: err.message });
+        return;
+      }
+      if (err.code === "RATE_LIMIT") {
+        res.status(429).json({ error: "Rate Limited", message: "X API rate limit reached. Try again shortly." });
+        return;
+      }
+    }
+    dataSource = "mock";
+    profile = mockProfile(rawUsername);
+    await delay(600);
+  }
 
+  // ── Score ─────────────────────────────────────────────────────────────────
+  const seed = rawUsername.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  const rand = makeRand(seed);
+  const growthRate = parseFloat(rand(-5, 25).toFixed(2));
+
+  const { score, engagementRate, breakdown } = buildScore(profile, rand);
+
+  // ── Persist ───────────────────────────────────────────────────────────────
   try {
     const db = getPool();
     if (db) {
@@ -250,37 +289,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
            engagement_rate, growth_rate, avg_likes, avg_retweets, avg_replies, tier)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
         [
-          data.username,
-          data.score,
-          data.followers,
-          data.following,
-          data.tweets,
-          data.engagementRate,
-          data.growthRate,
-          data.avgLikes,
-          data.avgRetweets,
-          data.avgReplies,
-          data.tier,
+          profile.username, score, profile.followers, profile.following, profile.tweets,
+          engagementRate, growthRate,
+          parseFloat(profile.avgLikes.toFixed(1)),
+          parseFloat(profile.avgRetweets.toFixed(1)),
+          parseFloat(profile.avgReplies.toFixed(1)),
+          getTier(profile.followers),
         ]
       );
     }
-  } catch (err) {
-    console.error("DB insert error:", err);
+  } catch (dbErr) {
+    console.error("DB insert error:", dbErr);
   }
 
   res.status(200).json({
-    username: data.username,
-    followers: data.followers,
-    following: data.following,
-    tweets: data.tweets,
-    engagementRate: data.engagementRate,
-    score: data.score,
-    growthRate: data.growthRate,
-    avgLikes: data.avgLikes,
-    avgRetweets: data.avgRetweets,
-    avgReplies: data.avgReplies,
-    tier: data.tier,
-    createdAt: data.createdAt,
-    breakdown: data.breakdown,
+    username:       profile.username,
+    followers:      profile.followers,
+    following:      profile.following,
+    tweets:         profile.tweets,
+    engagementRate,
+    score,
+    growthRate,
+    avgLikes:       parseFloat(profile.avgLikes.toFixed(1)),
+    avgRetweets:    parseFloat(profile.avgRetweets.toFixed(1)),
+    avgReplies:     parseFloat(profile.avgReplies.toFixed(1)),
+    tier:           getTier(profile.followers),
+    createdAt:      new Date().toISOString(),
+    dataSource,
+    breakdown,
   });
 }
