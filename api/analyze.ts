@@ -33,7 +33,7 @@ async function ensureTable(db: Pool): Promise<void> {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const RAPIDAPI_HOST = "twitter154.p.rapidapi.com";
+const RAPIDAPI_HOST = "twitter-api45.p.rapidapi.com";
 const API_TIMEOUT_MS = 8_000;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -186,9 +186,10 @@ async function fetchTwitterProfile(username: string): Promise<TwitterProfile> {
     "X-RapidAPI-Host": RAPIDAPI_HOST,
   };
 
-  // ── User profile ──────────────────────────────────────────────────────────
+  // ── User profile via twitter-api45 ───────────────────────────────────────
+  // Endpoint: GET /screenname.php?screenname=<username>
   const userRes = await fetch(
-    `https://${RAPIDAPI_HOST}/user/details?username=${encodeURIComponent(username)}`,
+    `https://${RAPIDAPI_HOST}/screenname.php?screenname=${encodeURIComponent(username)}`,
     { headers, signal: AbortSignal.timeout(API_TIMEOUT_MS) }
   );
 
@@ -198,23 +199,27 @@ async function fetchTwitterProfile(username: string): Promise<TwitterProfile> {
 
   const user = await userRes.json();
 
-  const followers       = user.follower_count  ?? user.followers_count ?? 0;
-  const following       = user.following_count ?? user.friends_count   ?? 0;
-  const tweets          = user.tweet_count     ?? user.statuses_count  ?? 0;
-  const resolvedUsername = user.username       ?? user.screen_name     ?? username;
+  // twitter-api45 field names
+  const followers        = Number(user.followers_count ?? user.follower_count  ?? 0);
+  const following        = Number(user.friends_count   ?? user.following_count ?? 0);
+  const tweets           = Number(user.statuses_count  ?? user.tweet_count     ?? 0);
+  const resolvedUsername = (user.screen_name ?? user.username ?? username) as string;
 
   // ── Recent tweets for engagement ──────────────────────────────────────────
   let avgLikes = 0, avgReplies = 0, avgRetweets = 0;
 
   try {
+    // twitter-api45: GET /timeline.php?screenname=<username>&limit=10
     const tweetsRes = await fetch(
-      `https://${RAPIDAPI_HOST}/user/tweets?username=${encodeURIComponent(username)}&limit=10&includeReplies=false&includeFulltext=false`,
+      `https://${RAPIDAPI_HOST}/timeline.php?screenname=${encodeURIComponent(username)}&limit=10`,
       { headers, signal: AbortSignal.timeout(API_TIMEOUT_MS) }
     );
 
     if (tweetsRes.ok) {
       const data = await tweetsRes.json();
-      const list: Record<string, number>[] = data.results ?? data.data ?? [];
+      const list: Record<string, number>[] = Array.isArray(data)
+        ? data
+        : (data.timeline ?? data.results ?? data.data ?? []);
 
       if (list.length > 0) {
         const avg = (k1: string, k2 = "") =>

@@ -6,7 +6,7 @@ const router: IRouter = Router();
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const RAPIDAPI_HOST = "twitter154.p.rapidapi.com";
+const RAPIDAPI_HOST = "twitter-api45.p.rapidapi.com";
 const API_TIMEOUT_MS = 8_000;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -154,9 +154,10 @@ async function fetchTwitterProfile(username: string): Promise<TwitterProfile> {
     "X-RapidAPI-Host": RAPIDAPI_HOST,
   };
 
-  // ── 1. User profile ──────────────────────────────────────────────────────
+  // ── 1. User profile via twitter-api45 ────────────────────────────────────
+  // Endpoint: GET /screenname.php?screenname=<username>
   const userRes = await fetch(
-    `https://${RAPIDAPI_HOST}/user/details?username=${encodeURIComponent(username)}`,
+    `https://${RAPIDAPI_HOST}/screenname.php?screenname=${encodeURIComponent(username)}`,
     { headers, signal: AbortSignal.timeout(API_TIMEOUT_MS) }
   );
 
@@ -166,37 +167,42 @@ async function fetchTwitterProfile(username: string): Promise<TwitterProfile> {
 
   const user = await userRes.json();
 
-  const followers = user.follower_count   ?? user.followers_count ?? 0;
-  const following = user.following_count  ?? user.friends_count   ?? 0;
-  const tweets    = user.tweet_count      ?? user.statuses_count  ?? 0;
-  const resolvedUsername = user.username  ?? user.screen_name     ?? username;
+  // twitter-api45 field names
+  const followers       = Number(user.followers_count ?? user.follower_count ?? 0);
+  const following       = Number(user.friends_count   ?? user.following_count ?? 0);
+  const tweets          = Number(user.statuses_count  ?? user.tweet_count ?? 0);
+  const resolvedUsername = (user.screen_name ?? user.username ?? username) as string;
 
-  // ── 2. Recent tweets for engagement metrics ──────────────────────────────
+  // ── 2. Recent tweets for engagement ──────────────────────────────────────
   let avgLikes = 0;
   let avgReplies = 0;
   let avgRetweets = 0;
 
   try {
+    // twitter-api45: GET /timeline.php?screenname=<username>&limit=10
     const tweetsRes = await fetch(
-      `https://${RAPIDAPI_HOST}/user/tweets?username=${encodeURIComponent(username)}&limit=10&includeReplies=false&includeFulltext=false`,
+      `https://${RAPIDAPI_HOST}/timeline.php?screenname=${encodeURIComponent(username)}&limit=10`,
       { headers, signal: AbortSignal.timeout(API_TIMEOUT_MS) }
     );
 
     if (tweetsRes.ok) {
       const tweetsData = await tweetsRes.json();
-      const list: Record<string, number>[] = tweetsData.results ?? tweetsData.data ?? [];
+      // Response is array or { timeline: [...] }
+      const list: Record<string, number>[] = Array.isArray(tweetsData)
+        ? tweetsData
+        : (tweetsData.timeline ?? tweetsData.results ?? tweetsData.data ?? []);
 
       if (list.length > 0) {
-        const sum = (key: string) =>
-          list.reduce((s, t) => s + (Number(t[key]) || 0), 0) / list.length;
+        const avg = (k1: string, k2 = "") =>
+          list.reduce((s: number, t) => s + (Number(t[k1]) || Number(t[k2]) || 0), 0) / list.length;
 
-        avgLikes    = sum("favorite_count") || sum("likes");
-        avgReplies  = sum("reply_count")    || sum("replies");
-        avgRetweets = sum("retweet_count")  || sum("retweets");
+        avgLikes    = avg("favorite_count", "likes");
+        avgReplies  = avg("reply_count",    "replies");
+        avgRetweets = avg("retweet_count",  "retweets");
       }
     }
   } catch {
-    // Engagement fetch failed — keep zeros, scoring still works
+    // Tweets fetch failed — engagement stays zero, scoring degrades gracefully
   }
 
   return {
