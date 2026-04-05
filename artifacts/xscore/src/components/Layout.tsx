@@ -16,7 +16,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <main className="flex-1 flex flex-col">{children}</main>
         <footer className="border-t border-border/50 py-6 mt-auto">
           <div className="max-w-6xl mx-auto px-4 text-center text-xs text-muted-foreground tracking-wide">
-            XScore &copy; {new Date().getFullYear()} &mdash; AI-powered influence analytics
+            XScore AI &copy; {new Date().getFullYear()} &mdash; AI-powered influence analytics
           </div>
         </footer>
       </div>
