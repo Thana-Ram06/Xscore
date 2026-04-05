@@ -201,13 +201,14 @@ async function fetchTwitterProfile(username: string): Promise<TwitterProfile> {
   if (userRes.status === 429) throw new TwitterApiError("RATE_LIMIT", "X API rate limit reached");
   if (!userRes.ok)            throw new TwitterApiError("API_ERROR", `Twitter API ${userRes.status}`);
 
-  const user = await userRes.json();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const user = await userRes.json() as any;
 
   // twitter-api45 field names
   const followers        = Number(user.followers_count ?? user.follower_count  ?? 0);
   const following        = Number(user.friends_count   ?? user.following_count ?? 0);
   const tweets           = Number(user.statuses_count  ?? user.tweet_count     ?? 0);
-  const resolvedUsername = (user.screen_name ?? user.username ?? username) as string;
+  const resolvedUsername = String(user.screen_name ?? user.username ?? username);
 
   // ── Recent tweets for engagement ──────────────────────────────────────────
   let avgLikes = 0, avgReplies = 0, avgRetweets = 0;
@@ -220,7 +221,8 @@ async function fetchTwitterProfile(username: string): Promise<TwitterProfile> {
     );
 
     if (tweetsRes.ok) {
-      const data = await tweetsRes.json();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data = await tweetsRes.json() as any;
       const list: Record<string, number>[] = Array.isArray(data)
         ? data
         : (data.timeline ?? data.results ?? data.data ?? []);
@@ -283,7 +285,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   // ── Score ─────────────────────────────────────────────────────────────────
-  const seed = rawUsername.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  const seed = rawUsername.split("").reduce((acc: number, c: string) => acc + c.charCodeAt(0), 0);
   const rand = makeRand(seed);
   const growthRate = parseFloat(rand(-5, 25).toFixed(2));
 
