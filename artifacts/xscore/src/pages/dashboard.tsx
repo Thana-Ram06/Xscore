@@ -35,7 +35,7 @@ type AnalyzeResultWithBreakdown = AnalyzeResult & {
 
 function getScoreLabel(score: number): string {
   if (score >= 700) return "Excellent";
-  if (score >= 300) return "متوسط";
+  if (score >= 300) return "Medium";
   return "Low";
 }
 
@@ -259,7 +259,7 @@ export default function Dashboard() {
                   {/* Score + label */}
                   <div>
                     <p className="text-xs text-muted-foreground uppercase tracking-widest mb-3">
-                      XScore Index
+                      XScore AI
                     </p>
                     <div className="flex items-end gap-4 flex-wrap">
                       <div className="flex items-baseline gap-1">
