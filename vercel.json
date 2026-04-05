@@ -1,7 +1,7 @@
 {
   "version": 2,
   "buildCommand": "pnpm --filter @workspace/xscore run build",
-  "outputDirectory": "artifacts/xscore/dist/public",
+  "outputDirectory": "artifacts/xscore/dist",
   "installCommand": "pnpm install --frozen-lockfile",
   "framework": null,
   "rewrites": [
