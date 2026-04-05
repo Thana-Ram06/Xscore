@@ -37,7 +37,11 @@ export default defineConfig({
   },
   root: path.resolve(import.meta.dirname),
   build: {
-    outDir: path.resolve(import.meta.dirname, "dist"),
+    // On Vercel, output to repo-root/out so Vercel finds it via outputDirectory:"out"
+    // Locally/Replit, output to artifacts/xscore/dist as normal
+    outDir: process.env.VERCEL
+      ? path.resolve(import.meta.dirname, "..", "..", "out")
+      : path.resolve(import.meta.dirname, "dist"),
     emptyOutDir: true,
   },
   server: {
