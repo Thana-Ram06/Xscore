@@ -1,8 +1,9 @@
 import { useTheme } from "@/hooks/use-theme";
-import { Sun, Moon, Activity, History } from "lucide-react";
+import { Sun, Moon, History } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { AuthButton } from "@/components/AuthButton";
 import { useAuth } from "@/contexts/AuthContext";
+import logoImg from "/logo.png";
 
 export function Header() {
   const { theme, setTheme } = useTheme();
@@ -14,10 +15,8 @@ export function Header() {
       <div className="max-w-6xl mx-auto flex h-14 items-center justify-between px-4">
         <div className="flex items-center gap-4">
           <Link href="/" className="flex items-center gap-2 group" data-testid="link-home">
-            <div className="bg-primary/10 p-1.5 rounded-md group-hover:bg-primary/20 transition-colors duration-300">
-              <Activity className="h-4 w-4 text-primary" />
-            </div>
-            <span className="font-serif text-xl font-semibold tracking-tight">XScore</span>
+            <img src={logoImg} alt="XScore AI logo" className="h-8 w-8 rounded-md object-contain" />
+            <span className="font-serif text-xl font-semibold tracking-tight">XScore <span className="text-primary">AI</span></span>
           </Link>
 
           {isConfigured && user && (
