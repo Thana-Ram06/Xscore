@@ -1,9 +1,10 @@
 import { useEffect } from "react";
-import { useParams, Link } from "wouter";
+import { useParams, Link, useLocation } from "wouter";
 import { Layout } from "@/components/Layout";
 import { AnimatedCounter } from "@/components/AnimatedCounter";
 import { useAnalyzeAccount, useGetSearchHistory } from "@workspace/api-client-react";
 import type { AnalyzeResult } from "@workspace/api-client-react";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   ArrowUpRight,
   ArrowDownRight,
@@ -159,6 +160,8 @@ function StatCard({
 
 export default function Dashboard() {
   const { username } = useParams<{ username: string }>();
+  const { user } = useAuth();
+  const [, setLocation] = useLocation();
 
   const {
     mutate: analyze,
@@ -173,10 +176,17 @@ export default function Dashboard() {
   const { data: historyData, isLoading: isLoadingHistory } = useGetSearchHistory();
 
   useEffect(() => {
-    if (username) {
-      analyze({ data: { username } });
+    // Redirect to home if not authenticated
+    if (!user) {
+      setLocation("/");
+      return;
     }
-  }, [username, analyze]);
+    if (username) {
+      console.log("Fetching real data for:", username);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      analyze({ data: { username, userId: user.uid, userEmail: user.email } as any });
+    }
+  }, [username, user, analyze, setLocation]);
 
   const recentHistory = historyData?.slice(0, 10) || [];
   const palette = analyzeData ? getScorePalette(analyzeData.score) : null;
@@ -198,7 +208,8 @@ export default function Dashboard() {
           <div className="rounded-2xl border border-border bg-card p-12 flex items-center justify-center min-h-[280px]">
             <div className="flex flex-col items-center gap-4 text-muted-foreground">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm">Analyzing @{username}…</p>
+              <p className="text-sm font-medium">Fetching real data for @{username}…</p>
+              <p className="text-xs text-muted-foreground">Connecting to X API</p>
             </div>
           </div>
         ) : error ? (
@@ -239,16 +250,9 @@ export default function Dashboard() {
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="text-xl font-serif font-semibold">@{analyzeData.username}</p>
-                        {analyzeData.dataSource === "mock" && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium">
-                            Simulated
-                          </span>
-                        )}
-                        {analyzeData.dataSource === "real" && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-medium">
-                            Live data
-                          </span>
-                        )}
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-medium">
+                          Live data
+                        </span>
                       </div>
                       <span className="inline-block mt-1 text-xs px-2.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-medium">
                         {analyzeData.tier} Influencer
