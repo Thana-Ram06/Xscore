@@ -197,46 +197,61 @@ export default function Home() {
 
         {/* Input + inline results */}
         <div className="w-full max-w-md flex flex-col items-center">
-          <form
-            onSubmit={handleAnalyze}
-            className="w-full"
-            data-testid="form-analyze"
-          >
-            <div className="flex items-center gap-0 rounded-xl border border-border bg-card overflow-hidden focus-within:border-primary/50 transition-all duration-300">
-              <div className="flex items-center pl-4 text-muted-foreground select-none shrink-0">
-                <span className="text-sm font-medium">@</span>
+          {!user ? (
+            /* ── Not logged in — auth gate ── */
+            <div className="w-full rounded-2xl border border-border bg-card p-6 text-center space-y-3">
+              <div className="h-10 w-10 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto">
+                <Search className="h-5 w-5" />
               </div>
-              <input
-                type="text"
-                placeholder="username"
-                className="flex-1 bg-transparent px-3 py-3.5 text-sm text-foreground placeholder:text-muted-foreground outline-none"
-                value={username}
-                onChange={(e) => {
-                  setUsername(e.target.value);
-                  if (result) setResult(null);
-                }}
-                disabled={analyzeMutation.isPending}
-                data-testid="input-username"
-              />
-              <button
-                type="submit"
-                disabled={analyzeMutation.isPending || !username.trim()}
-                className="m-1.5 flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                data-testid="button-analyze"
-              >
-                {analyzeMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Search className="h-4 w-4" />
-                )}
-                {analyzeMutation.isPending ? "Analyzing..." : "Analyze"}
-              </button>
+              <p className="font-semibold text-sm">Sign in to analyze accounts</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Create a free account to start scoring any X profile with real AI-powered data.
+              </p>
             </div>
-          </form>
+          ) : (
+            /* ── Logged in — full analyzer ── */
+            <form
+              onSubmit={handleAnalyze}
+              className="w-full"
+              data-testid="form-analyze"
+            >
+              <div className="flex items-center gap-0 rounded-xl border border-border bg-card overflow-hidden focus-within:border-primary/50 transition-all duration-300">
+                <div className="flex items-center pl-4 text-muted-foreground select-none shrink-0">
+                  <span className="text-sm font-medium">@</span>
+                </div>
+                <input
+                  type="text"
+                  placeholder="username"
+                  className="flex-1 bg-transparent px-3 py-3.5 text-sm text-foreground placeholder:text-muted-foreground outline-none"
+                  value={username}
+                  onChange={(e) => {
+                    setUsername(e.target.value);
+                    if (result) setResult(null);
+                  }}
+                  disabled={analyzeMutation.isPending}
+                  data-testid="input-username"
+                />
+                <button
+                  type="submit"
+                  disabled={analyzeMutation.isPending || !username.trim()}
+                  className="m-1.5 flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                  data-testid="button-analyze"
+                >
+                  {analyzeMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Search className="h-4 w-4" />
+                  )}
+                  {analyzeMutation.isPending ? "Fetching real data..." : "Analyze"}
+                </button>
+              </div>
+            </form>
+          )}
 
           {/* Loading pulse */}
           {analyzeMutation.isPending && (
             <div className="w-full mt-4 rounded-2xl border border-border bg-card p-6 animate-pulse space-y-3">
+              <p className="text-xs text-center text-muted-foreground mb-2">Fetching real Twitter data...</p>
               <div className="flex items-center gap-3">
                 <div className="h-9 w-9 rounded-full bg-muted" />
                 <div className="space-y-1.5 flex-1">
