@@ -9,7 +9,7 @@ function getPool(): Pool | null {
   return pool;
 }
 
-export default async function handler(_req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const db = getPool();
     if (!db) {
@@ -17,21 +17,49 @@ export default async function handler(_req: VercelRequest, res: VercelResponse) 
       return;
     }
 
-    const { rows } = await db.query(
-      `SELECT
-         id, username, score, followers, following, tweets,
-         engagement_rate AS "engagementRate",
-         growth_rate AS "growthRate",
-         avg_likes AS "avgLikes",
-         avg_retweets AS "avgRetweets",
-         avg_replies AS "avgReplies",
-         tier,
-         searched_at AS "searchedAt"
-       FROM searches
-       ORDER BY searched_at DESC
-       LIMIT 10`
-    );
+    const userId = typeof req.query.userId === "string" ? req.query.userId : null;
 
+    let queryText: string;
+    let queryParams: string[];
+
+    if (userId) {
+      queryText = `
+        SELECT
+          id, username, score, followers, following, tweets,
+          engagement_rate AS "engagementRate",
+          growth_rate AS "growthRate",
+          avg_likes AS "avgLikes",
+          avg_retweets AS "avgRetweets",
+          avg_replies AS "avgReplies",
+          tier,
+          searched_at AS "searchedAt",
+          user_id AS "userId",
+          user_email AS "userEmail"
+        FROM searches
+        WHERE user_id = $1
+        ORDER BY searched_at DESC
+        LIMIT 50
+      `;
+      queryParams = [userId];
+    } else {
+      queryText = `
+        SELECT
+          id, username, score, followers, following, tweets,
+          engagement_rate AS "engagementRate",
+          growth_rate AS "growthRate",
+          avg_likes AS "avgLikes",
+          avg_retweets AS "avgRetweets",
+          avg_replies AS "avgReplies",
+          tier,
+          searched_at AS "searchedAt"
+        FROM searches
+        ORDER BY searched_at DESC
+        LIMIT 10
+      `;
+      queryParams = [];
+    }
+
+    const { rows } = await db.query(queryText, queryParams);
     res.status(200).json(rows);
   } catch (err) {
     console.error("DB query error:", err);

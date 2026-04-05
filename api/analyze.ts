@@ -26,9 +26,13 @@ async function ensureTable(db: Pool): Promise<void> {
       avg_retweets REAL NOT NULL DEFAULT 0,
       avg_replies REAL NOT NULL DEFAULT 0,
       tier TEXT NOT NULL,
-      searched_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      searched_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      user_id TEXT,
+      user_email TEXT
     )
   `);
+  await db.query(`ALTER TABLE searches ADD COLUMN IF NOT EXISTS user_id TEXT`);
+  await db.query(`ALTER TABLE searches ADD COLUMN IF NOT EXISTS user_email TEXT`);
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -248,6 +252,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
   const rawUsername =
     typeof body?.username === "string" ? body.username.replace(/^@/, "").trim() : "";
+  const userId    = typeof body?.userId    === "string" ? body.userId    : null;
+  const userEmail = typeof body?.userEmail === "string" ? body.userEmail : null;
 
   if (!rawUsername) {
     res.status(400).json({ error: "Bad Request", message: "username is required" });
@@ -291,8 +297,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       await db.query(
         `INSERT INTO searches
           (username, score, followers, following, tweets,
-           engagement_rate, growth_rate, avg_likes, avg_retweets, avg_replies, tier)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+           engagement_rate, growth_rate, avg_likes, avg_retweets, avg_replies, tier,
+           user_id, user_email)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
         [
           profile.username, score, profile.followers, profile.following, profile.tweets,
           engagementRate, growthRate,
@@ -300,6 +307,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           parseFloat(profile.avgRetweets.toFixed(1)),
           parseFloat(profile.avgReplies.toFixed(1)),
           getTier(profile.followers),
+          userId, userEmail,
         ]
       );
     }
