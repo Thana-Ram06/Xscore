@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "pnpm --filter @workspace/xscore run build",
+  "buildCommand": "pnpm --filter @workspace/xscore run build && cp -r $VERCEL_PROJECT_ROOT/artifacts/xscore/dist $VERCEL_PROJECT_ROOT/out",
   "outputDirectory": "out",
   "installCommand": "pnpm install --frozen-lockfile",
   "framework": null,
