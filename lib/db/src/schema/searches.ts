@@ -15,6 +15,8 @@ export const searchesTable = pgTable("searches", {
   avgRetweets: real("avg_retweets").notNull().default(0),
   avgReplies: real("avg_replies").notNull().default(0),
   tier: text("tier").notNull(),
+  userId: text("user_id"),
+  userEmail: text("user_email"),
   searchedAt: timestamp("searched_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { Layout } from "@/components/Layout";
 import { useAnalyzeAccount } from "@workspace/api-client-react";
 import type { AnalyzeResult } from "@workspace/api-client-react";
+import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import {
   Search,
@@ -111,6 +112,7 @@ export default function Home() {
   const [result, setResult] = useState<AnalyzeResult | null>(null);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const analyzeMutation = useAnalyzeAccount({
     mutation: {
@@ -140,7 +142,14 @@ export default function Home() {
       return;
     }
     setResult(null);
-    analyzeMutation.mutate({ data: { username: clean } });
+    // Pass auth info so the backend can associate results with the user
+    analyzeMutation.mutate({
+      data: {
+        username: clean,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ...(user ? { userId: user.uid, userEmail: user.email } : {}),
+      } as any,
+    });
   };
 
   const handleViewFull = () => {

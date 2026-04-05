@@ -220,6 +220,10 @@ async function fetchTwitterProfile(username: string): Promise<TwitterProfile> {
 // ─── Route ────────────────────────────────────────────────────────────────────
 
 router.post("/analyze", async (req, res): Promise<void> => {
+  // Extract optional auth fields before Zod parsing (Zod strips unknown fields)
+  const userId: string | undefined   = typeof req.body?.userId    === "string" ? req.body.userId    : undefined;
+  const userEmail: string | undefined = typeof req.body?.userEmail === "string" ? req.body.userEmail : undefined;
+
   const parsed = AnalyzeAccountBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Bad Request", message: parsed.error.message });
@@ -276,6 +280,8 @@ router.post("/analyze", async (req, res): Promise<void> => {
       avgRetweets:    parseFloat(profile.avgRetweets.toFixed(1)),
       avgReplies:     parseFloat(profile.avgReplies.toFixed(1)),
       tier:           getTier(profile.followers),
+      userId:         userId ?? null,
+      userEmail:      userEmail ?? null,
     });
   } catch (dbErr) {
     console.error("DB insert error:", dbErr);

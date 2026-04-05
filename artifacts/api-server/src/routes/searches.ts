@@ -9,14 +9,17 @@ import {
 
 const router: IRouter = Router();
 
-router.get("/searches", async (_req, res): Promise<void> => {
-  const searches = await db
+router.get("/searches", async (req, res): Promise<void> => {
+  const userId = typeof req.query.userId === "string" ? req.query.userId : undefined;
+
+  const rows = await db
     .select()
     .from(searchesTable)
+    .where(userId ? eq(searchesTable.userId, userId) : undefined)
     .orderBy(desc(searchesTable.searchedAt))
-    .limit(10);
+    .limit(20);
 
-  res.json(GetSearchHistoryResponse.parse(searches));
+  res.json(GetSearchHistoryResponse.parse(rows));
 });
 
 router.get("/searches/:id", async (req, res): Promise<void> => {
