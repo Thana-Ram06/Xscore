@@ -31,7 +31,7 @@ interface ScoreBreakdown {
 
 type AnalyzeResultWithBreakdown = AnalyzeResult & {
   breakdown?: ScoreBreakdown;
-  dataSource?: "real" | "mock";
+  dataSource?: "real";
 };
 
 function getScoreLabel(score: number): string {
