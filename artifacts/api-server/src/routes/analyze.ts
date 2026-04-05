@@ -19,7 +19,6 @@ interface TwitterProfile {
   avgLikes: number;
   avgReplies: number;
   avgRetweets: number;
-  isReal: boolean;
 }
 
 interface ScoreBreakdown {
@@ -40,17 +39,7 @@ function getTier(followers: number): string {
   return "Mega";
 }
 
-/** Seeded pseudo-random deterministic number in [min, max) */
-function makeRand(seed: number) {
-  return (min: number, max: number): number => {
-    const x = Math.sin(seed + min + max) * 10_000;
-    return min + (x - Math.floor(x)) * (max - min);
-  };
-}
-
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-// ─── Scoring factors (each 0–100) ────────────────────────────────────────────
+// ─── Scoring factors (each 0–100, all derived from real data) ────────────────
 
 function calcEngagementScore(avgLikes: number, avgReplies: number, followers: number): number {
   if (followers === 0) return 0;
@@ -71,18 +60,21 @@ function calcFollowerQualityScore(followers: number, engagementRate: number): nu
   return Math.min(sizeBonus + erBonus, 100);
 }
 
-function calcGrowthScore(rand: ReturnType<typeof makeRand>): number {
-  const pattern = rand(0, 1);
-  if (pattern > 0.6) return rand(68, 95);
-  if (pattern > 0.3) return rand(42, 67);
-  return rand(15, 41);
+/** Growth estimated from real engagement + follower reach signals (no randomness) */
+function calcGrowthScore(followers: number, engagementRate: number): number {
+  const engagementSignal = Math.min((engagementRate / 5) * 60, 60);
+  const followerSignal   = Math.min(
+    (Math.log10(Math.max(followers, 1)) / Math.log10(1_000_000)) * 40,
+    40
+  );
+  return parseFloat((engagementSignal + followerSignal).toFixed(1));
 }
 
 function calcActivityScore(tweets: number): number {
   const tweetsPerWeek = tweets / 104;
   if (tweetsPerWeek < 0.5) return 15;
-  if (tweetsPerWeek < 2) return 45;
-  if (tweetsPerWeek <= 5) return 72;
+  if (tweetsPerWeek < 2)   return 45;
+  if (tweetsPerWeek <= 5)  return 72;
   if (tweetsPerWeek <= 20) return 100;
   if (tweetsPerWeek <= 40) return 78;
   if (tweetsPerWeek <= 70) return 55;
@@ -95,15 +87,18 @@ function calcAuthorityScore(followers: number, following: number): number {
   return Math.min((Math.log10(1 + ratio) / Math.log10(101)) * 100, 100);
 }
 
-function buildScore(profile: TwitterProfile, rand: ReturnType<typeof makeRand>) {
+function buildScore(profile: TwitterProfile) {
   const engagementRate = parseFloat(
-    Math.min(((profile.avgLikes + profile.avgReplies) / Math.max(profile.followers, 1)) * 100, 15).toFixed(2)
+    Math.min(
+      ((profile.avgLikes + profile.avgReplies) / Math.max(profile.followers, 1)) * 100,
+      15
+    ).toFixed(2)
   );
 
   const breakdown: ScoreBreakdown = {
     engagement:      parseFloat(calcEngagementScore(profile.avgLikes, profile.avgReplies, profile.followers).toFixed(1)),
     followerQuality: parseFloat(calcFollowerQualityScore(profile.followers, engagementRate).toFixed(1)),
-    growth:          parseFloat(calcGrowthScore(rand).toFixed(1)),
+    growth:          parseFloat(calcGrowthScore(profile.followers, engagementRate).toFixed(1)),
     activity:        parseFloat(calcActivityScore(profile.tweets).toFixed(1)),
     authority:       parseFloat(calcAuthorityScore(profile.followers, profile.following).toFixed(1)),
   };
@@ -117,29 +112,21 @@ function buildScore(profile: TwitterProfile, rand: ReturnType<typeof makeRand>) 
 
   const score = parseFloat(Math.min(Math.max(weightedRaw * 10, 0), 1000).toFixed(1));
 
-  return { score, engagementRate, breakdown };
-}
+  // Growth rate derived from real engagement (not random)
+  const growthRate = parseFloat(
+    Math.min(25, Math.max(-5, (engagementRate - 2.5) * 4)).toFixed(2)
+  );
 
-// ─── Mock data generator (deterministic by username seed) ─────────────────────
-
-function mockProfile(username: string): TwitterProfile {
-  const seed = username.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
-  const rand = makeRand(seed);
-
-  const followers = Math.floor(rand(500, 2_000_000));
-  const following = Math.floor(rand(100, Math.min(followers * 0.8, 50_000)));
-  const tweets    = Math.floor(rand(50, 50_000));
-  const avgLikes    = rand(2, Math.min(followers * 0.08, 50_000));
-  const avgReplies  = avgLikes * rand(0.05, 0.15);
-  const avgRetweets = avgLikes * rand(0.1, 0.3);
-
-  return { username, followers, following, tweets, avgLikes, avgReplies, avgRetweets, isReal: false };
+  return { score, engagementRate, growthRate, breakdown };
 }
 
 // ─── Real Twitter data via RapidAPI ──────────────────────────────────────────
 
 class TwitterApiError extends Error {
-  constructor(public readonly code: "USER_NOT_FOUND" | "RATE_LIMIT" | "API_ERROR", message: string) {
+  constructor(
+    public readonly code: "USER_NOT_FOUND" | "RATE_LIMIT" | "API_ERROR" | "NO_KEY",
+    message: string
+  ) {
     super(message);
     this.name = "TwitterApiError";
   }
@@ -147,15 +134,14 @@ class TwitterApiError extends Error {
 
 async function fetchTwitterProfile(username: string): Promise<TwitterProfile> {
   const apiKey = process.env.TWITTER_API_KEY;
-  if (!apiKey) throw new Error("TWITTER_API_KEY not configured — using mock data");
+  if (!apiKey) throw new TwitterApiError("NO_KEY", "Twitter API key not configured");
 
   const headers = {
     "X-RapidAPI-Key":  apiKey,
     "X-RapidAPI-Host": RAPIDAPI_HOST,
   };
 
-  // ── 1. User profile via twitter-api45 ────────────────────────────────────
-  // Endpoint: GET /screenname.php?screenname=<username>
+  // ── 1. User profile ───────────────────────────────────────────────────────
   const userRes = await fetch(
     `https://${RAPIDAPI_HOST}/screenname.php?screenname=${encodeURIComponent(username)}`,
     { headers, signal: AbortSignal.timeout(API_TIMEOUT_MS) }
@@ -163,23 +149,20 @@ async function fetchTwitterProfile(username: string): Promise<TwitterProfile> {
 
   if (userRes.status === 404) throw new TwitterApiError("USER_NOT_FOUND", `@${username} not found on X`);
   if (userRes.status === 429) throw new TwitterApiError("RATE_LIMIT", "X API rate limit reached");
-  if (!userRes.ok) throw new TwitterApiError("API_ERROR", `Twitter API responded ${userRes.status}`);
+  if (!userRes.ok)            throw new TwitterApiError("API_ERROR", `Twitter API responded ${userRes.status}`);
 
   const user = await userRes.json();
+  console.log("API DATA (profile):", JSON.stringify(user).slice(0, 500));
 
-  // twitter-api45 field names
-  const followers       = Number(user.followers_count ?? user.follower_count ?? 0);
-  const following       = Number(user.friends_count   ?? user.following_count ?? 0);
-  const tweets          = Number(user.statuses_count  ?? user.tweet_count ?? 0);
-  const resolvedUsername = (user.screen_name ?? user.username ?? username) as string;
+  const followers        = Number((user as any).followers_count ?? (user as any).follower_count  ?? 0);
+  const following        = Number((user as any).friends_count   ?? (user as any).following_count ?? 0);
+  const tweets           = Number((user as any).statuses_count  ?? (user as any).tweet_count     ?? 0);
+  const resolvedUsername = String((user as any).screen_name ?? (user as any).username ?? username);
 
-  // ── 2. Recent tweets for engagement ──────────────────────────────────────
-  let avgLikes = 0;
-  let avgReplies = 0;
-  let avgRetweets = 0;
+  // ── 2. Recent tweets for real engagement ─────────────────────────────────
+  let avgLikes = 0, avgReplies = 0, avgRetweets = 0;
 
   try {
-    // twitter-api45: GET /timeline.php?screenname=<username>&limit=10
     const tweetsRes = await fetch(
       `https://${RAPIDAPI_HOST}/timeline.php?screenname=${encodeURIComponent(username)}&limit=10`,
       { headers, signal: AbortSignal.timeout(API_TIMEOUT_MS) }
@@ -187,10 +170,11 @@ async function fetchTwitterProfile(username: string): Promise<TwitterProfile> {
 
     if (tweetsRes.ok) {
       const tweetsData = await tweetsRes.json();
-      // Response is array or { timeline: [...] }
+      console.log("API DATA (timeline sample):", JSON.stringify(tweetsData).slice(0, 300));
+
       const list: Record<string, number>[] = Array.isArray(tweetsData)
         ? tweetsData
-        : (tweetsData.timeline ?? tweetsData.results ?? tweetsData.data ?? []);
+        : ((tweetsData as any).timeline ?? (tweetsData as any).results ?? (tweetsData as any).data ?? []);
 
       if (list.length > 0) {
         const avg = (k1: string, k2 = "") =>
@@ -199,30 +183,28 @@ async function fetchTwitterProfile(username: string): Promise<TwitterProfile> {
         avgLikes    = avg("favorite_count", "likes");
         avgReplies  = avg("reply_count",    "replies");
         avgRetweets = avg("retweet_count",  "retweets");
+
+        console.log(`Engagement from ${list.length} tweets — likes:${avgLikes.toFixed(1)} replies:${avgReplies.toFixed(1)} retweets:${avgRetweets.toFixed(1)}`);
       }
     }
-  } catch {
-    // Tweets fetch failed — engagement stays zero, scoring degrades gracefully
+  } catch (e) {
+    console.warn("Timeline fetch failed:", e);
   }
 
-  return {
-    username: resolvedUsername,
-    followers,
-    following,
-    tweets,
-    avgLikes,
-    avgReplies,
-    avgRetweets,
-    isReal: true,
-  };
+  return { username: resolvedUsername, followers, following, tweets, avgLikes, avgReplies, avgRetweets };
 }
 
 // ─── Route ────────────────────────────────────────────────────────────────────
 
 router.post("/analyze", async (req, res): Promise<void> => {
-  // Extract optional auth fields before Zod parsing (Zod strips unknown fields)
-  const userId: string | undefined   = typeof req.body?.userId    === "string" ? req.body.userId    : undefined;
-  const userEmail: string | undefined = typeof req.body?.userEmail === "string" ? req.body.userEmail : undefined;
+  // ── Auth check — require signed-in user ───────────────────────────────────
+  const userId: string | null    = typeof req.body?.userId    === "string" ? req.body.userId    : null;
+  const userEmail: string | null = typeof req.body?.userEmail === "string" ? req.body.userEmail : null;
+
+  if (!userId) {
+    res.status(401).json({ error: "Unauthorized", message: "Please sign in to analyze accounts." });
+    return;
+  }
 
   const parsed = AnalyzeAccountBody.safeParse(req.body);
   if (!parsed.success) {
@@ -236,9 +218,8 @@ router.post("/analyze", async (req, res): Promise<void> => {
     return;
   }
 
-  // ── Fetch real data, fall back to mock on any non-fatal error ─────────────
+  // ── Fetch real data — no mock fallback ───────────────────────────────────
   let profile: TwitterProfile;
-  let dataSource: "real" | "mock" = "real";
 
   try {
     profile = await fetchTwitterProfile(rawUsername);
@@ -252,19 +233,18 @@ router.post("/analyze", async (req, res): Promise<void> => {
         res.status(429).json({ error: "Rate Limited", message: "X API rate limit reached. Try again shortly." });
         return;
       }
+      if (err.code === "NO_KEY") {
+        res.status(503).json({ error: "Service Unavailable", message: "Twitter API not configured." });
+        return;
+      }
     }
-    // Any other error (no key, network failure, etc.) → fall back silently
-    dataSource = "mock";
-    profile = mockProfile(rawUsername);
-    await delay(600); // keep UX consistent
+    console.error("fetchTwitterProfile error:", err);
+    res.status(500).json({ error: "Unable to fetch real data", message: "Could not retrieve Twitter data. Try again." });
+    return;
   }
 
   // ── Score ──────────────────────────────────────────────────────────────────
-  const seed = rawUsername.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
-  const rand = makeRand(seed);
-  const growthRate = parseFloat(rand(-5, 25).toFixed(2));
-
-  const { score, engagementRate, breakdown } = buildScore(profile, rand);
+  const { score, engagementRate, growthRate, breakdown } = buildScore(profile);
 
   // ── Persist ────────────────────────────────────────────────────────────────
   try {
@@ -280,8 +260,8 @@ router.post("/analyze", async (req, res): Promise<void> => {
       avgRetweets:    parseFloat(profile.avgRetweets.toFixed(1)),
       avgReplies:     parseFloat(profile.avgReplies.toFixed(1)),
       tier:           getTier(profile.followers),
-      userId:         userId ?? null,
-      userEmail:      userEmail ?? null,
+      userId,
+      userEmail,
     });
   } catch (dbErr) {
     console.error("DB insert error:", dbErr);
@@ -300,7 +280,7 @@ router.post("/analyze", async (req, res): Promise<void> => {
     avgReplies:     parseFloat(profile.avgReplies.toFixed(1)),
     tier:           getTier(profile.followers),
     createdAt:      new Date().toISOString(),
-    dataSource,
+    dataSource:     "real",
     breakdown,
   });
 });
