@@ -183,13 +183,25 @@ async function fetchTwitterProfile(username: string): Promise<TwitterProfile> {
   if (!userRes.ok)            throw new TwitterApiError("API_ERROR", `Twitter API ${userRes.status}`);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const user = await userRes.json() as any;
-  console.log("API DATA (profile):", JSON.stringify(user).slice(0, 500));
+  const raw = await userRes.json() as any;
+  console.log("RAW API DATA:", JSON.stringify(raw, null, 2));
+
+  // twitter-api45 /screenname.php returns flat OR nested structure
+  // Try nested first (data.user.result.legacy), then fall back to flat root
+  const legacy = raw?.data?.user?.result?.legacy ?? raw?.user?.legacy ?? raw;
+  const user   = legacy ?? raw;
+  console.log("Extracted user object keys:", Object.keys(user || {}).join(", "));
 
   const followers        = Number(user.followers_count ?? user.follower_count  ?? 0);
   const following        = Number(user.friends_count   ?? user.following_count ?? 0);
   const tweets           = Number(user.statuses_count  ?? user.tweet_count     ?? 0);
   const resolvedUsername = String(user.screen_name ?? user.username ?? username);
+
+  console.log(`Extracted — @${resolvedUsername}: followers=${followers} following=${following} tweets=${tweets}`);
+
+  if (followers === 0 && following === 0 && tweets === 0) {
+    throw new TwitterApiError("API_ERROR", "API returned zero values — check field mapping or subscription plan");
+  }
 
   // ── Recent tweets for real engagement ────────────────────────────────────
   let avgLikes = 0, avgReplies = 0, avgRetweets = 0;
@@ -230,6 +242,8 @@ async function fetchTwitterProfile(username: string): Promise<TwitterProfile> {
 // ─── Handler ──────────────────────────────────────────────────────────────────
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  console.log("API route hit:", req.method, req.url);
+
   if (req.method !== "POST") {
     res.status(405).json({ error: "Method Not Allowed" });
     return;
@@ -248,6 +262,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const rawUsername =
     typeof body?.username === "string" ? body.username.replace(/^@/, "").trim() : "";
+  console.log("Calling API with username:", rawUsername);
 
   if (!rawUsername) {
     res.status(400).json({ error: "Bad Request", message: "username is required" });
