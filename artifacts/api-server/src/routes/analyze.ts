@@ -151,13 +151,25 @@ async function fetchTwitterProfile(username: string): Promise<TwitterProfile> {
   if (userRes.status === 429) throw new TwitterApiError("RATE_LIMIT", "X API rate limit reached");
   if (!userRes.ok)            throw new TwitterApiError("API_ERROR", `Twitter API responded ${userRes.status}`);
 
-  const user = await userRes.json();
-  console.log("API DATA (profile):", JSON.stringify(user).slice(0, 500));
+  const raw = await userRes.json();
+  console.log("RAW API DATA:", JSON.stringify(raw, null, 2));
 
-  const followers        = Number((user as any).followers_count ?? (user as any).follower_count  ?? 0);
-  const following        = Number((user as any).friends_count   ?? (user as any).following_count ?? 0);
-  const tweets           = Number((user as any).statuses_count  ?? (user as any).tweet_count     ?? 0);
-  const resolvedUsername = String((user as any).screen_name ?? (user as any).username ?? username);
+  // twitter-api45 /screenname.php — try nested structure first, then flat root
+  const r = raw as any;
+  const legacy = r?.data?.user?.result?.legacy ?? r?.user?.legacy ?? r;
+  const user   = legacy ?? r;
+  console.log("Extracted user object keys:", Object.keys(user || {}).join(", "));
+
+  const followers        = Number(user.followers_count ?? user.follower_count  ?? 0);
+  const following        = Number(user.friends_count   ?? user.following_count ?? 0);
+  const tweets           = Number(user.statuses_count  ?? user.tweet_count     ?? 0);
+  const resolvedUsername = String(user.screen_name ?? user.username ?? username);
+
+  console.log(`Extracted — @${resolvedUsername}: followers=${followers} following=${following} tweets=${tweets}`);
+
+  if (followers === 0 && following === 0 && tweets === 0) {
+    throw new TwitterApiError("API_ERROR", "API returned zero values — check field mapping or subscription plan");
+  }
 
   // ── 2. Recent tweets for real engagement ─────────────────────────────────
   let avgLikes = 0, avgReplies = 0, avgRetweets = 0;
@@ -197,6 +209,8 @@ async function fetchTwitterProfile(username: string): Promise<TwitterProfile> {
 // ─── Route ────────────────────────────────────────────────────────────────────
 
 router.post("/analyze", async (req, res): Promise<void> => {
+  console.log("API route hit: POST /analyze");
+
   // ── Auth check — require signed-in user ───────────────────────────────────
   const userId: string | null    = typeof req.body?.userId    === "string" ? req.body.userId    : null;
   const userEmail: string | null = typeof req.body?.userEmail === "string" ? req.body.userEmail : null;
@@ -217,8 +231,9 @@ router.post("/analyze", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Bad Request", message: "username is required" });
     return;
   }
+  console.log("Calling API with:", rawUsername);
 
-  // ── Fetch real data — no mock fallback ───────────────────────────────────
+  // ── Fetch real data — no mock fallback, no fake values ───────────────────
   let profile: TwitterProfile;
 
   try {
