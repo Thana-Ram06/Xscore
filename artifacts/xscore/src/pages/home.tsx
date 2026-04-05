@@ -18,19 +18,15 @@ import {
 } from "lucide-react";
 
 function getScoreLabel(score: number): string {
-  if (score >= 850) return "Elite";
-  if (score >= 650) return "Excellent";
-  if (score >= 400) return "Strong";
-  if (score >= 200) return "Growing";
-  return "Emerging";
+  if (score >= 700) return "Excellent";
+  if (score >= 300) return "Medium";
+  return "Low";
 }
 
 function getScoreColor(score: number): string {
-  if (score >= 850) return "text-primary";
-  if (score >= 650) return "text-emerald-400";
-  if (score >= 400) return "text-blue-400";
-  if (score >= 200) return "text-yellow-400";
-  return "text-orange-400";
+  if (score >= 700) return "text-emerald-400";
+  if (score >= 300) return "text-yellow-400";
+  return "text-red-400";
 }
 
 function ResultCard({ data, onViewFull }: { data: AnalyzeResult; onViewFull: () => void }) {
@@ -51,10 +47,13 @@ function ResultCard({ data, onViewFull }: { data: AnalyzeResult; onViewFull: () 
           </div>
         </div>
         <div className="text-right">
-          <p className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">XScore</p>
+          <p className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">XScore AI</p>
           <p className={`text-2xl font-serif font-bold ${getScoreColor(data.score)}`}>
             {Math.round(data.score)}
             <span className="text-xs text-muted-foreground font-normal">/1000</span>
+          </p>
+          <p className={`text-xs font-semibold mt-0.5 ${getScoreColor(data.score)}`}>
+            {getScoreLabel(data.score)}
           </p>
         </div>
       </div>
