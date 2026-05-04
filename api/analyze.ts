@@ -184,7 +184,7 @@ class TwitterApiError extends Error {
   }
 }
 
-async function fetchTwitterProfile(username: string): Promise<TwitterProfile> {
+async function fetchTwitterProfile(username: string): Promise<{ profile: TwitterProfile; isSimulated: boolean }> {
   const apiKey = process.env.TWITTER_API_KEY;
   if (!apiKey) throw new TwitterApiError("NO_KEY", "Twitter API key not configured");
 
