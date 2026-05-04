@@ -31,7 +31,7 @@ interface ScoreBreakdown {
 
 type AnalyzeResultWithBreakdown = AnalyzeResult & {
   breakdown?: ScoreBreakdown;
-  dataSource?: "real";
+  dataSource?: "real" | "mock";
 };
 
 function getScoreLabel(score: number): string {
@@ -250,9 +250,15 @@ export default function Dashboard() {
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="text-xl font-serif font-semibold">@{analyzeData.username}</p>
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-medium">
-                          Live data
-                        </span>
+                        {analyzeData.dataSource === "mock" ? (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium">
+                            Simulated
+                          </span>
+                        ) : (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-medium">
+                            Live data
+                          </span>
+                        )}
                       </div>
                       <span className="inline-block mt-1 text-xs px-2.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-medium">
                         {analyzeData.tier} Influencer
