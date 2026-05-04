@@ -74,6 +74,18 @@ function formatNum(n: number): string {
   return n.toLocaleString();
 }
 
+/** Returns formatted number or "N/A" when value is zero / null / undefined */
+function displayNum(n: number | null | undefined): string {
+  if (n == null || n <= 0) return "N/A";
+  return formatNum(n);
+}
+
+/** Returns formatted percentage or "N/A" when value is zero / null / undefined */
+function displayRate(n: number | null | undefined): string {
+  if (n == null || n <= 0) return "N/A";
+  return `${n.toFixed(2)}%`;
+}
+
 // ── Breakdown bar ─────────────────────────────────────────────────────────────
 function BreakdownBar({
   label,
@@ -326,7 +338,7 @@ export default function Dashboard() {
                       Followers
                     </p>
                     <p className="text-2xl font-serif font-bold" data-testid="stat-followers">
-                      {formatNum(analyzeData.followers)}
+                      {displayNum(analyzeData.followers)}
                     </p>
                   </div>
                   <div className="border-t border-border/50" />
@@ -335,7 +347,7 @@ export default function Dashboard() {
                       Following
                     </p>
                     <p className="text-2xl font-serif font-bold">
-                      {formatNum(analyzeData.following)}
+                      {displayNum(analyzeData.following)}
                     </p>
                   </div>
                   <div className="border-t border-border/50" />
@@ -344,7 +356,7 @@ export default function Dashboard() {
                       Total Tweets
                     </p>
                     <p className="text-2xl font-serif font-bold">
-                      {formatNum(analyzeData.tweets)}
+                      {displayNum(analyzeData.tweets)}
                     </p>
                   </div>
                 </div>
@@ -355,25 +367,25 @@ export default function Dashboard() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <StatCard
                 label="Engagement Rate"
-                value={`${analyzeData.engagementRate.toFixed(2)}%`}
+                value={displayRate(analyzeData.engagementRate)}
                 icon={<MessageCircle className="h-4 w-4" />}
                 accent="bg-primary/10 text-primary"
               />
               <StatCard
                 label="Avg Likes"
-                value={formatNum(Math.round(analyzeData.avgLikes))}
+                value={displayNum(Math.round(analyzeData.avgLikes))}
                 icon={<Heart className="h-4 w-4" />}
                 accent="bg-pink-500/10 text-pink-400"
               />
               <StatCard
                 label="Avg Retweets"
-                value={formatNum(Math.round(analyzeData.avgRetweets))}
+                value={displayNum(Math.round(analyzeData.avgRetweets))}
                 icon={<Repeat2 className="h-4 w-4" />}
                 accent="bg-blue-500/10 text-blue-400"
               />
               <StatCard
                 label="Avg Replies"
-                value={formatNum(Math.round(analyzeData.avgReplies))}
+                value={displayNum(Math.round(analyzeData.avgReplies))}
                 icon={<TrendingUp className="h-4 w-4" />}
                 accent="bg-orange-500/10 text-orange-400"
               />
@@ -431,7 +443,7 @@ export default function Dashboard() {
                       </div>
                       <div className="flex items-center gap-3">
                         <span className="text-xs text-muted-foreground hidden sm:block">
-                          {formatNum(record.followers)} followers
+                          {displayNum(record.followers)} followers
                         </span>
                         <div className="flex flex-col items-end gap-0.5">
                           <span
