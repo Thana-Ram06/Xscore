@@ -70,6 +70,27 @@ function getTier(followers: number): string {
   return "Mega";
 }
 
+/** Deterministic seeded pseudo-random — same username always gives same values */
+function makeRand(seed: number) {
+  return (min: number, max: number): number => {
+    const x = Math.sin(seed + min + max) * 10_000;
+    return min + (x - Math.floor(x)) * (max - min);
+  };
+}
+
+/** Simulated profile used when real API data is unavailable */
+function simulatedProfile(username: string): TwitterProfile {
+  const seed = username.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+  const r = makeRand(seed);
+  const followers   = Math.floor(r(1_000, 500_000));
+  const following   = Math.floor(r(100, Math.min(followers * 0.5, 20_000)));
+  const tweets      = Math.floor(r(200, 30_000));
+  const avgLikes    = r(10, Math.min(followers * 0.05, 20_000));
+  const avgReplies  = avgLikes * r(0.05, 0.15);
+  const avgRetweets = avgLikes * r(0.1, 0.3);
+  return { username, followers, following, tweets, avgLikes, avgReplies, avgRetweets };
+}
+
 // ─── Scoring factors (each 0–100, all derived from real data) ────────────────
 
 function calcEngagementScore(avgLikes: number, avgReplies: number, followers: number): number {
@@ -199,8 +220,10 @@ async function fetchTwitterProfile(username: string): Promise<TwitterProfile> {
 
   console.log(`Extracted — @${resolvedUsername}: followers=${followers} following=${following} tweets=${tweets}`);
 
+  // If API returns all zeros (subscription inactive), fall back to simulated data
   if (followers === 0 && following === 0 && tweets === 0) {
-    throw new TwitterApiError("API_ERROR", "API returned zero values — check field mapping or subscription plan");
+    console.warn("API returned zero values — using simulated data for", resolvedUsername);
+    return { profile: simulatedProfile(resolvedUsername), isSimulated: true };
   }
 
   // ── Recent tweets for real engagement ────────────────────────────────────
@@ -236,7 +259,7 @@ async function fetchTwitterProfile(username: string): Promise<TwitterProfile> {
     console.warn("Timeline fetch failed:", e);
   }
 
-  return { username: resolvedUsername, followers, following, tweets, avgLikes, avgReplies, avgRetweets };
+  return { profile: { username: resolvedUsername, followers, following, tweets, avgLikes, avgReplies, avgRetweets }, isSimulated: false };
 }
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
@@ -269,11 +292,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  // ── Fetch real data — no fallbacks ───────────────────────────────────────
+  // ── Fetch real data, fall back to simulation if API returns zeros ─────────
   let profile: TwitterProfile;
+  let dataSource: "real" | "mock" = "real";
 
   try {
-    profile = await fetchTwitterProfile(rawUsername);
+    const result = await fetchTwitterProfile(rawUsername);
+    profile = result.profile;
+    if (result.isSimulated) dataSource = "mock";
   } catch (err) {
     if (err instanceof TwitterApiError) {
       if (err.code === "USER_NOT_FOUND") {
@@ -336,7 +362,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     avgReplies:     parseFloat(profile.avgReplies.toFixed(1)),
     tier:           getTier(profile.followers),
     createdAt:      new Date().toISOString(),
-    dataSource:     "real",
+    dataSource,
     breakdown,
   });
 }
