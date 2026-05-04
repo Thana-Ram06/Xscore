@@ -265,23 +265,14 @@ router.post("/analyze", async (req, res): Promise<void> => {
     profile = result.profile;
     if (result.isSimulated) dataSource = "mock";
   } catch (err) {
-    if (err instanceof TwitterApiError) {
-      if (err.code === "USER_NOT_FOUND") {
-        res.status(404).json({ error: "Not Found", message: err.message });
-        return;
-      }
-      if (err.code === "RATE_LIMIT") {
-        res.status(429).json({ error: "Rate Limited", message: "X API rate limit reached. Try again shortly." });
-        return;
-      }
-      if (err.code === "NO_KEY") {
-        res.status(503).json({ error: "Service Unavailable", message: "Twitter API not configured." });
-        return;
-      }
+    if (err instanceof TwitterApiError && err.code === "USER_NOT_FOUND") {
+      res.status(404).json({ error: "Not Found", message: err.message });
+      return;
     }
-    console.error("fetchTwitterProfile error:", err);
-    res.status(500).json({ error: "Unable to fetch real data", message: "Could not retrieve Twitter data. Try again." });
-    return;
+    // For all other errors (no key, rate limit, bad response, etc.) fall back to simulation
+    console.warn("API unavailable, using simulated data:", err instanceof Error ? err.message : err);
+    profile = simulatedProfile(rawUsername);
+    dataSource = "mock";
   }
 
   // ── Score ──────────────────────────────────────────────────────────────────
